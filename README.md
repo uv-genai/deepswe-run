@@ -141,6 +141,48 @@ OPENAI_API_KEY=sk-local
   inside the container).
 - The API key is a placeholder; LiteLLM here doesn't authenticate.
 
+### 3.5 Pin litellm in Pier (required after every pier upgrade)
+
+Pier installs the agent with a bare `uv tool install mini-swe-agent` inside **every
+trial image build**, so the agent's `litellm` dependency always resolves to whatever
+version is newest on PyPI at build time. On **2026-10-18, litellm 1.106.0** was
+released (13:49 local) with a broken optional import — every trial image built after
+that died within minutes:
+
+```
+litellm.APIConnectionError: OpenAIException - No module named 'mcp'.
+Retrying <unknown> in 4/8/16/32/60 seconds ...  (then the agent gives up)
+```
+
+The verifier then grades an **empty patch → reward 0, f2p 0/total** for every
+affected trial (22 trials were zeroed before the run was stopped — the model was
+never at fault). Working images (built before the release) carry `litellm 1.105.1`.
+
+**The fix** — pin the dependency in Pier's install spec (applied in this setup):
+
+```bash
+# file: <pier>/site-packages/pier/agents/installed/mini_swe_agent.py  (line ~653)
+uv tool install mini-swe-agent{version_spec} --with "litellm==1.105.1"
+```
+
+- The install spec is hashed into the agent-install fingerprint, so a changed pin
+  forces a **fresh image build** — no stale cache can reintroduce the bad version.
+- The pin only affects trials built *after* it is applied; running trials keep the
+  code they started with.
+- **`uv tool upgrade datacurve-pier` reinstalls the package files and silently
+  wipes this edit.** After any pier upgrade, before any run:
+
+```bash
+./reapply-litellm-pin.sh     # idempotent; verifies the edit parses; fails safe
+```
+
+  Both `run_deepswe.sh` (warm-up) and `rerun-failed-trials.sh` (preflight) abort
+  early if the pin is missing, so the failure mode is caught before trials start.
+
+If a future pier release restructures that install command, the reapply script
+detects it and prints the candidate lines instead of guessing — apply the
+`--with "litellm==1.105.1"` addition manually in that case.
+
 ---
 
 ## 4. Running benchmarks
@@ -301,6 +343,8 @@ done
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| Agent log fills with `litellm.APIConnectionError ... No module named 'mcp'`, trials finish in ~5 min with reward 0 / f2p 0 | unpinned litellm resolved to a broken release at image build (e.g. 1.106.0) — **not** a model failure | `./reapply-litellm-pin.sh` (§3.5), then re-run the affected trials with `./rerun-failed-trials.sh` |
+| After `uv tool upgrade datacurve-pier`, new trials fail with the mcp error | upgrade wiped the litellm pin | `./reapply-litellm-pin.sh` (§3.5) |
 | Trials die mid-run; dockerd logs `no space left on device` | disk full — images + build cache accumulate ~1.7 GB/task | reclaim (§4 "Disk space"), resume the job |
 | `pier job resume` crashes: `ValidationError ... EOF while parsing a value` | disk-full crash left 0-byte `result.json` files | `rm` the empty `*/result.json` files, then resume (trials re-run) |
 | All trials error `NonZeroAgentExitCodeError`; agent log ends in `litellm.InternalServerError ... [Errno 111] Connection refused` | proxy's backend name resolves to a dead address (mDNS flake) — `/v1/models` still 200s, so preflight passes | pin `system76.local` (§3.3), re-run |
@@ -322,10 +366,15 @@ Upstream task/verifier issues belong to
 ## 7. Files in this directory
 
 ```
-run_deepswe.sh      benchmark launcher (preflight + warm-up + pier run)
-scoreboard.sh       live results viewer for a running job
-.env                base-URL/API-key env passed to pier
-deep-swe/           benchmark corpus (113 tasks), cloned from GitHub
-jobs/               per-job results (pier output)
-resume.log          output of the last `pier job resume`
+run_deepswe.sh           benchmark launcher (preflight + warm-up + pier run)
+scoreboard.sh            live results viewer for a running job
+rerun-failed-trials.sh   quarantine mcp-poisoned trials + resume the job
+reapply-litellm-pin.sh   re-pin litellm after a pier upgrade (§3.5)
+free-space.sh            reclaim per-trial docker images + build cache
+resume.sh                one-off: resume the interrupted gufo job
+.env                     base-URL/API-key env passed to pier
+deep-swe/                benchmark corpus (113 tasks), cloned from GitHub
+jobs/                    per-job results (pier output); .infra-failed-backup/
+                         inside a job holds quarantined infra-failed trials
+resume.log               output of the running `pier job resume` (.prev = last one)
 ```

@@ -57,6 +57,10 @@ fi
 
 [[ -n "$MODEL" ]] || { usage; echo; die "model name is required (try: ./run_deepswe.sh --list)"; }
 command -v pier >/dev/null || die "pier not on PATH (uv tool install datacurve-pier)"
+MSA=$(ls -1 /home/ugo/.local/share/uv/tools/datacurve-pier/lib/python*/site-packages/pier/agents/installed/mini_swe_agent.py 2>/dev/null | head -1)
+if [[ -n "$MSA" ]] && ! grep -q 'litellm==1.105.1' "$MSA"; then
+  die "litellm pin missing from pier (upgraded?) - run: ./reapply-litellm-pin.sh (README §3.5)"
+fi
 [[ -d "$TASKS_DIR" ]] || die "tasks dir not found: $TASKS_DIR (git clone https://github.com/datacurve-ai/deep-swe.git)"
 
 # ---------- prereq checks ----------
