@@ -47,7 +47,7 @@ argument changes.
 | `pier` ≥ 0.3.1 | Harbor-compatible eval runner | `pier --version` |
 | LiteLLM proxy on :4000 | model routing | `curl -s localhost:4000/v1/models` |
 | `llama-swap` on :8080 | llama.cpp model serving | `systemctl is-active llama-swap` |
-| ~40+ GB free disk | prebuilt task images from ECR | `df -h /` |
+| ≥250 GB free disk | full run: ~1.5–1.7 GB of images+build cache per task (see §4) | `df -h /` |
 | ~40+ GB RAM | model (≈30 GB) + trial containers (8 GB each) | `free -g` |
 
 Install Pier (once):
@@ -191,6 +191,42 @@ Note: concurrency raises *task* throughput, not *token* throughput — all trial
 one llama.cpp instance. Higher concurrency mainly hides tool-execution/verifier time
 behind model generation.
 
+### Disk space budget & reclamation
+
+Measured on this machine: each task costs **~1.5–1.7 GB** of Docker images + build
+cache (agent image ~1 GB content, a separate verifier image, a ~76 MB per-trial squid
+image, ~2.4 GB build-cache growth; tasks share base layers from the common ECR image).
+Job results/trajectories are negligible (<10 MB/trial).
+
+| Run | Disk needed |
+|---|---|
+| Single task / pilot (5 tasks) | ~10 GB |
+| Full 113-task corpus, from scratch | **~180 GB peak → keep ≥250 GB free** |
+| Resumed job, N trials remaining | N × ~1.7 GB |
+
+⚠️ Pier's `--delete` removes trial **containers**, not **images** — per-trial images
+accumulate monotonically for the whole job. A full run that starts with too little
+free disk dies near the end with `no space left on device` (containers crash,
+`result.json` files get truncated to 0 bytes, and a later `pier job resume` fails to
+parse them — see §6).
+
+**Reclaim after any job finishes** (returns ~80% of the footprint):
+
+```bash
+# 1. remove per-trial images (safe: skips images still used by containers)
+docker ps -a --format '{{.Image}}' | sed 's/[^:]$/&:latest/' | sort -u > /tmp/keep.txt
+docker images --format '{{.Repository}}:{{.Tag}}' \
+  | grep -E '(-main|-pier-egress-proxy|__verifier__trial-main):latest$' \
+  | grep -vxFf /tmp/keep.txt | xargs -r docker rmi
+
+# 2. cap the build cache (keep the last 30 GB of layers)
+docker builder prune -f --keep-storage 30GB
+```
+
+**Orphaned containers** from a crashed run keep running (and hold their images)
+unless Pier shut down cleanly — check for trial containers whose job is no longer
+running and `docker rm` them; they waste RAM and block image deletion.
+
 ### Manual invocation (no wrapper)
 
 ```bash
@@ -214,8 +250,15 @@ full local-model run takes **multiple days**.
 
 ```bash
 tail -f deepswe-<model>.log     # live job log
+./scoreboard.sh                  # live scoreboard (newest job; auto-refresh 30s)
+./scoreboard.sh jobs/<job-name>  # specific job
 pier view jobs                  # web UI over all job trajectories (127.0.0.1:8080+)
 ```
+
+`scoreboard.sh` reads each trial's `verifier/reward.json` as it lands, so it shows
+the **running solve rate** (solved/graded, mean partial credit), a per-task table,
+and what's in flight — Pier itself only prints the reward table after the whole job
+finishes. It exits automatically when the job completes.
 
 Per-trial outputs land in `jobs/<job-name>/<task>__<id>/`:
 
@@ -258,6 +301,8 @@ done
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| Trials die mid-run; dockerd logs `no space left on device` | disk full — images + build cache accumulate ~1.7 GB/task | reclaim (§4 "Disk space"), resume the job |
+| `pier job resume` crashes: `ValidationError ... EOF while parsing a value` | disk-full crash left 0-byte `result.json` files | `rm` the empty `*/result.json` files, then resume (trials re-run) |
 | All trials error `NonZeroAgentExitCodeError`; agent log ends in `litellm.InternalServerError ... [Errno 111] Connection refused` | proxy's backend name resolves to a dead address (mDNS flake) — `/v1/models` still 200s, so preflight passes | pin `system76.local` (§3.3), re-run |
 | All LLM calls fail: `litellm.InternalServerError ... Connection error` | LiteLLM proxy's backend on :8080 not running | `systemctl start llama-swap` |
 | Script aborts: `deepswe-relay container is down` | relay missing | recreate it (§3.2) |
@@ -278,8 +323,9 @@ Upstream task/verifier issues belong to
 
 ```
 run_deepswe.sh      benchmark launcher (preflight + warm-up + pier run)
+scoreboard.sh       live results viewer for a running job
 .env                base-URL/API-key env passed to pier
 deep-swe/           benchmark corpus (113 tasks), cloned from GitHub
 jobs/               per-job results (pier output)
-smoke.log           leftover log from the initial smoke test
+resume.log          output of the last `pier job resume`
 ```
