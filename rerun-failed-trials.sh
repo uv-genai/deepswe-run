@@ -32,7 +32,22 @@ cd "$REPO"
 [[ -f "$JOB/config.json" ]] || die "not a job dir: $JOB"
 pgrep -f "bin/python .*pier (run|job resume)" >/dev/null && die "a pier job is already running - stop it first"
 grep -q 'litellm==1.105.1' "$PIER_MSA" 2>/dev/null \
-  || die "litellm pin missing from pier ($PIER_MSA) - reapply it or every new trial fails again"
+  || die "litellm pin missing from pier ($PIER_MSA) - run ./reapply-litellm-pin.sh first (README §3.5)"
+
+# reclaim leaked trial networks: pkill'ing pier skips compose down, and Docker's
+# address pools are finite -> 'all predefined address pools have been fully subnetted'
+n_net=0
+while read -r id name; do
+  [[ "$name" =~ __[a-z0-9]{7}(_|$) ]] || continue
+  c=$(docker network inspect -f '{{len .Containers}}' "$id" 2>/dev/null || echo -1)
+  if [[ "$c" == "0" ]]; then
+    docker network rm "$id" >/dev/null 2>&1 && n_net=$((n_net+1)) && echo "  reclaimed leaked network: $name"
+  fi
+done < <(docker network ls --format '{{.ID}} {{.Name}}')
+echo "leaked trial networks reclaimed: $n_net"
+docker network create "__pool-probe" >/dev/null 2>&1 \
+  && docker network rm "__pool-probe" >/dev/null \
+  || die "docker address pool still exhausted - remove orphan networks: docker network ls"
 docker ps --format '{{.Names}}' | grep -q '^deepswe-relay$' \
   || die "deepswe-relay container is down (see README §3.2)"
 echo -n "model endpoint: "
@@ -55,6 +70,22 @@ while IFS= read -r log; do
   n_moved=$((n_moved + 1))
 done < <(grep -rl "$MCP_MARKER" "$JOB"/*/agent/mini-swe-agent.txt 2>/dev/null || true)
 echo "quarantined: $n_moved trial(s) -> ${BACKUP#"$REPO/"}/"
+
+# ---------- 2b. quarantine infra-errored trials (e.g. docker address-pool exhaustion) ----------
+# These have a result.json (so resume would treat them as DONE and never re-run
+# them) but the exception is pier/docker infrastructure, not a model outcome.
+n_rt=0
+mapfile -t RT_RESULTS < <(find "$JOB" -mindepth 2 -maxdepth 2 -name result.json -not -path "*/.infra-failed-backup/*" | sort)
+for r in "${RT_RESULTS[@]}"; do
+  et=$(python3 -c "import json,sys;print(((json.load(open(sys.argv[1])).get('exception_info') or {}).get('exception_type') or ''))" "$r" 2>/dev/null || echo "")
+  if [[ "$et" == "RuntimeError" ]]; then
+    d=$(dirname "$r")
+    echo "  quarantined (RuntimeError): $(basename "$d")"
+    mv "$d" "$BACKUP/"
+    n_rt=$((n_rt + 1))
+  fi
+done
+echo "infra-errored trials quarantined: $n_rt"
 
 # ---------- 3. drop empty/corrupt trial results from the kill ----------
 n_bad=0
