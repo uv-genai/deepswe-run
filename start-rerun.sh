@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Detached launcher for the DeepSWE rerun.
 #
-#   ./start-rerun.sh            # foreground: shows launch outcome in ~1-2 min, then exits
-#   nohup ./start-rerun.sh >/dev/null 2>&1 &   # fully detached from the start
+#   ./start-rerun.sh                 # full rerun, job default concurrency
+#   ./start-rerun.sh -n 2            # cap at 2 concurrent trials/requests
+#   nohup ./start-rerun.sh -n 2 >/dev/null 2>&1 &   # detached from the start
+#
+# Extra arguments are forwarded to rerun-failed-trials.sh (see its header:
+# optional job-dir positional and -n concurrency).
 #
 # All real output goes to files, never to the terminal you launched from:
 #   rerun-start.log   preflight + launch result (one-shot, written by rerun-failed-trials.sh)
@@ -16,7 +20,7 @@ cd "$(dirname "$0")"
 LOG=rerun-start.log
 [[ -f "$LOG" ]] && mv -f "$LOG" "$LOG.prev"
 
-./rerun-failed-trials.sh > "$LOG" 2>&1 &
+./rerun-failed-trials.sh "$@" > "$LOG" 2>&1 &
 LAUNCHER=$!
 echo "launcher PID $LAUNCHER - preflight/launch output: $LOG"
 

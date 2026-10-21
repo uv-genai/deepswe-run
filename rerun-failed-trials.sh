@@ -17,8 +17,25 @@
 #      base URL, then verifies it started cleanly
 set -euo pipefail
 
+#   ./rerun-failed-trials.sh [job-dir] [-n N]
+#
+#   -n N   set trial concurrency to N before resuming (Pier has no -n on
+#          resume; both config.json and lock.json must be changed together or
+#          the resume lock check fails). N trials = at most N simultaneous
+#          model requests (modulo client retries).
+set -euo pipefail
+
 REPO="/home/ugo/projects/deepswe-test"
-JOB="${1:-jobs/deepswe-gufo-qwen3.8-flash-next-tp2-q8}"
+JOB=""
+N_CONC=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--n-concurrent) N_CONC="$2"; shift 2 ;;
+    -*) die_flag() { echo "ERROR: unknown flag: $1" >&2; exit 1; }; die_flag "$1" ;;
+    *) JOB="$1"; shift ;;
+  esac
+done
+JOB="${JOB:-jobs/deepswe-gufo-qwen3.8-flash-next-tp2-q8}"
 case "$JOB" in /*) ;; *) JOB="$REPO/$JOB" ;; esac
 MCP_MARKER="No module named 'mcp'"
 PIER_MSA="/home/ugo/.local/share/uv/tools/datacurve-pier/lib/python3.13/site-packages/pier/agents/installed/mini_swe_agent.py"
@@ -71,21 +88,63 @@ while IFS= read -r log; do
 done < <(grep -rl "$MCP_MARKER" "$JOB"/*/agent/mini-swe-agent.txt 2>/dev/null || true)
 echo "quarantined: $n_moved trial(s) -> ${BACKUP#"$REPO/"}/"
 
-# ---------- 2b. quarantine infra-errored trials (e.g. docker address-pool exhaustion) ----------
-# These have a result.json (so resume would treat them as DONE and never re-run
-# them) but the exception is pier/docker infrastructure, not a model outcome.
+# ---------- 2b. quarantine infra-errored trials ----------
+# These have a result.json (resume treats them as DONE), but the failure is
+# infrastructure, not a model outcome. Evidence-based rules:
+#   - RuntimeError                                  -> docker/pier infra (always)
+#   - NonZeroAgentExit/AgentTimeout + reward 0 +
+#     InternalServerError markers in the agent log   -> died in a proxy 500 storm
+#   - errored but reward 1 (solved despite exception) -> NEVER touch
+#   - errored, reward 0, no 500s                      -> genuine failure/timeout;
+#                                                       left for the end-of-run review
 n_rt=0
 mapfile -t RT_RESULTS < <(find "$JOB" -mindepth 2 -maxdepth 2 -name result.json -not -path "*/.infra-failed-backup/*" | sort)
 for r in "${RT_RESULTS[@]}"; do
   et=$(python3 -c "import json,sys;print(((json.load(open(sys.argv[1])).get('exception_info') or {}).get('exception_type') or ''))" "$r" 2>/dev/null || echo "")
+  [[ -n "$et" ]] || continue
+  d=$(dirname "$r")
+  keep=0
   if [[ "$et" == "RuntimeError" ]]; then
-    d=$(dirname "$r")
-    echo "  quarantined (RuntimeError): $(basename "$d")"
+    keep=1
+  elif [[ "$et" == "NonZeroAgentExitCodeError" || "$et" == "AgentTimeoutError" ]]; then
+    reward=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('reward'))" "$d/verifier/reward.json" 2>/dev/null || echo none)
+    if [[ "$reward" == "0" ]] && grep -q "InternalServerError" "$d/agent/mini-swe-agent.txt" 2>/dev/null; then
+      keep=1
+    fi
+  fi
+  if [[ "$keep" == "1" ]]; then
+    echo "  quarantined ($et): $(basename "$d")"
     mv "$d" "$BACKUP/"
     n_rt=$((n_rt + 1))
   fi
 done
 echo "infra-errored trials quarantined: $n_rt"
+
+# ---------- 2c. set trial concurrency (config.json + lock.json must agree) ----------
+if [[ -n "$N_CONC" ]]; then
+  [[ "$N_CONC" =~ ^[0-9]+$ && "$N_CONC" -ge 1 ]] || die "invalid -n value: $N_CONC"
+  python3 - "$JOB" "$N_CONC" <<'PY'
+import json, sys
+job, n = sys.argv[1], int(sys.argv[2])
+for name in ("config.json", "lock.json"):
+    p = f"{job}/{name}"
+    try:
+        data = json.load(open(p))
+    except Exception as e:
+        sys.exit(f"cannot parse {p}: {e}")
+    old = data.get("n_concurrent_trials")
+    if old != n:
+        data["n_concurrent_trials"] = n
+        with open(p, "w") as fh:
+            json.dump(data, fh, indent=4)
+        print(f"  concurrency {name}: {old} -> {n}")
+    else:
+        print(f"  concurrency {name}: {n} (unchanged)")
+PY
+  # both files must still be valid JSON after the edit
+  python3 -c "import json,sys; [json.load(open(f)) for f in (sys.argv[1]+'/config.json', sys.argv[1]+'/lock.json')]" "$JOB" \
+    || die "config/lock edit left invalid JSON - restore from .prev if needed"
+fi
 
 # ---------- 3. drop empty/corrupt trial results from the kill ----------
 n_bad=0
