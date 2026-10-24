@@ -2,13 +2,18 @@
 # Engine for the post-completion re-runs: launches a NEW pier job over a task
 # subset computed from the finished main job.
 #
-#   ./rerun-subset.sh zeros     [-n N] [--dry]
-#   ./rerun-subset.sh nearmiss  [-n N] [--dry]
+#   ./rerun-subset.sh zeros        [-n N] [--dry] [--incremental]
+#   ./rerun-subset.sh nearmiss     [-n N] [--dry] [--incremental]
+#   ./rerun-subset.sh failed13     [-n N] [--dry] [--incremental]
 #
 #   zeros     reward=0 and f2p < 50%   (includes the ungraded verifier-timeout task)
 #   nearmiss  reward=0 and f2p >= 50%
+#   failed13  the 13 remaining zeros of the zeros-rerun job
 #   -n N      concurrent trials (default 1 = strictly serial model requests)
 #   --dry     compute + print everything, do not launch
+#   --incremental  inject commit-incremental.yaml (commit after each feature;
+#                  otherwise discarded-at-submit work scores zero - see
+#                  reports/zeros-rerun-analysis-2026-10-21.md)
 #   MODEL=... override the model (default gufo-qwen3.8-flash-next-tp2-q8)
 #
 # Normally invoked via the thin wrappers rerun-zeros.sh / rerun-nearmiss.sh.
@@ -22,56 +27,84 @@ MODEL_SLUG="${MODEL//\//_}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-GROUP="${1:-}"; [[ -n "$GROUP" ]] || die "usage: $0 zeros|nearmiss [-n N] [--dry]"; shift || true
-N_CONC=1; DRY=0
+GROUP="${1:-}"; [[ -n "$GROUP" ]] || die "usage: $0 zeros|nearmiss|failed13 [-n N] [--dry] [--incremental]"; shift || true
+N_CONC=1; DRY=0; INCR=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -n|--n-concurrent) N_CONC="$2"; shift 2 ;;
     --dry) DRY=1; shift ;;
+    --incremental) INCR=1; shift ;;
     *) die "unknown argument: $1" ;;
   esac
 done
-[[ "$GROUP" == "zeros" || "$GROUP" == "nearmiss" ]] || die "group must be zeros or nearmiss"
+[[ "$GROUP" == "zeros" || "$GROUP" == "nearmiss" || "$GROUP" == "failed13" ]] || die "group must be zeros, nearmiss or failed13"
 [[ "$N_CONC" =~ ^[0-9]+$ && "$N_CONC" -ge 1 ]] || die "invalid -n: $N_CONC"
 [[ -f "$MAIN/result.json" ]] || die "main job not found: $MAIN"
 
 JOB_NAME="deepswe-${MODEL_SLUG}-${GROUP}-rerun"
+[[ "$INCR" == "1" ]] && JOB_NAME+="-inc"
 LOG="$REPO/${JOB_NAME}.log"
 cd "$REPO"
 
-# ---------- compute task list from the finished main job ----------
-mapfile -t TASKS < <(python3 - "$MAIN" "$GROUP" "$MODEL_SLUG" <<'PYEOF'
+if [[ "$INCR" == "1" && ! -f "$REPO/commit-incremental.yaml" ]]; then
+  die "commit-incremental.yaml not found in $REPO"
+fi
+
+# ---------- compute task list ----------
+if [[ "$GROUP" == "failed13" ]]; then
+  SOURCE_JOB="$REPO/jobs/deepswe-gufo-qwen3.8-flash-next-tp2-q8-zeros-rerun"
+  [[ -d "$SOURCE_JOB" ]] || die "zeros-rerun job not found: $SOURCE_JOB"
+  mapfile -t TASKS < <(python3 - "$SOURCE_JOB" "$MODEL_SLUG" <<'PYEOF'
 import json, glob, os, sys
-main, group, model_slug = sys.argv[1], sys.argv[2], sys.argv[3]
-tasks = {}
-for d in sorted(glob.glob(main + '/*/')):
+src, model_slug = sys.argv[1], sys.argv[2]
+sel = []
+for d in sorted(glob.glob(src + '/*/')):
     if '.infra' in d: continue
-    cfg = d + 'config.json'
-    if not os.path.exists(cfg): continue
-    try: slug = os.path.basename(json.load(open(cfg))['task']['path'].rstrip('/'))
-    except Exception: continue
     rw = d + 'verifier/reward.json'
-    if os.path.exists(rw):
-        v = json.load(open(rw)); tasks[slug] = (v.get('reward', 0), v.get('f2p', 0.0))
-    else:
-        tasks[slug] = (0, None)   # ungraded (verifier timeout)
-# solved anywhere in a same-model job (e.g. a standalone single-task run) is solved:
-# exclude it so re-runs never duplicate recovered tasks
-solved_elsewhere = set()
-for rw in glob.glob(os.path.join(os.path.dirname(main), f'deepswe-{model_slug}*/', '*/verifier/reward.json')):
+    if not (os.path.exists(rw) and json.load(open(rw)).get('reward') == 0): continue
+    try: slug = os.path.basename(json.load(open(d + 'config.json'))['task']['path'].rstrip('/'))
+    except Exception: continue
+    sel.append(slug)
+# solved-elsewhere guard: same-model job that already scored reward=1 for this task
+solved = set()
+for rw in glob.glob(os.path.join(os.path.dirname(src), f'deepswe-{model_slug}*/', '*/verifier/reward.json')):
     if '/.infra-failed-backup/' in rw: continue
     try:
         if json.load(open(rw)).get('reward') == 1:
-            d = os.path.dirname(os.path.dirname(rw))
-            cfg = os.path.join(d, 'config.json')
-            solved_elsewhere.add(os.path.basename(json.load(open(cfg))['task']['path'].rstrip('/')))
+            solved.add(os.path.basename(json.load(open(os.path.dirname(os.path.dirname(rw)) + '/config.json'))['task']['path'].rstrip('/')))
     except Exception: pass
-sel = sorted(s for s, (r, f) in tasks.items()
-             if r == 0 and s not in solved_elsewhere
-             and ((f is None or f < 0.5) if group == 'zeros' else (f is not None and f >= 0.5)))
+print('\n'.join(sorted(set(sel) - solved)))
+PYEOF
+  )
+else
+  mapfile -t TASKS < <(python3 - "$MAIN" "$GROUP" "$MODEL_SLUG" <<'PYEOF'
+import json, glob, os, sys
+main, group, model_slug = sys.argv[1], sys.argv[2], sys.argv[3]
+# Latest attempt per task across MAIN + every same-model job: reruns change scores
+# (solved tasks drop out of re-run lists; new near-misses drop in).
+latest = {}   # slug -> (mtime, reward, f2p|None)
+for rw in glob.glob(os.path.join(os.path.dirname(main), f'deepswe-{model_slug}*/', '*/verifier/reward.json')):
+    if '/.infra-failed-backup/' in rw: continue
+    try:
+        d = os.path.dirname(os.path.dirname(rw))
+        slug = os.path.basename(json.load(open(d + '/config.json'))['task']['path'].rstrip('/'))
+        v = json.load(open(rw)); m = os.path.getmtime(rw)
+        if slug not in latest or m > latest[slug][0]:
+            latest[slug] = (m, v.get('reward', 0), v.get('f2p', 0.0))
+    except Exception: pass
+# never-graded tasks (should be none after the full corpus): treat as ungraded zeros
+for d in sorted(glob.glob(main + '/*/')):
+    if '.infra' in d or os.path.exists(d + 'verifier/reward.json'): continue
+    try:
+        slug = os.path.basename(json.load(open(d + 'config.json'))['task']['path'].rstrip('/'))
+        latest.setdefault(slug, (0, 0, None))
+    except Exception: pass
+sel = sorted(s for s, (m, r, f) in latest.items()
+             if r == 0 and ((f is None or f < 0.5) if group == 'zeros' else (f is not None and f >= 0.5)))
 print('\n'.join(sel))
 PYEOF
 )
+fi
 [[ ${#TASKS[@]} -ge 1 ]] || die "no tasks matched group '$GROUP'"
 echo "group '$GROUP': ${#TASKS[@]} task(s):"
 printf '  %s\n' "${TASKS[@]}"
@@ -114,6 +147,7 @@ export OPENAI_API_KEY=sk-local
 
 CMD=(pier run -p "$REPO/deep-swe/tasks" --agent mini-swe-agent --model "openai/${MODEL}"
      --job-name "$JOB_NAME" --n-concurrent "$N_CONC" -y)
+[[ "$INCR" == "1" ]] && CMD+=(--ak "config_yaml=$(cat "$REPO/commit-incremental.yaml")")
 for t in "${TASKS[@]}"; do CMD+=(-i "$t"); done
 
 echo; echo "running: ${CMD[*]}"
@@ -127,3 +161,4 @@ fi
 echo "running. Watch with:"
 echo "  tail -f ${LOG#"$REPO/"}/"
 echo "  ./scoreboard.sh jobs/$JOB_NAME"
+[[ "$INCR" == "1" ]] && echo "(commit-incremental config active: first trial's log header should show custom.yaml in the config specs)"
