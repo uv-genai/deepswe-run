@@ -2,3 +2,4 @@
 jobs
 nohup.out
 *.log
+archived-jobs/
