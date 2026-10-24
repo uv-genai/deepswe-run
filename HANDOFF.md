@@ -1,0 +1,211 @@
+# HANDOFF — DeepSWE Benchmark Sessions
+
+> **Purpose:** everything a fresh agent session (or human) needs to resume this work
+> with zero rediscovery. Read top to bottom once, then jump to §5 (the pending task).
+> Companion deep-dives: `reports/zeros-rerun-analysis-2026-10-21.md`,
+> `reports/nearmiss-rerun-results-2026-10-24.md`.
+
+---
+
+## 0. TL;DR
+
+- **Project:** run the DeepSWE benchmark (113 tasks) against local models via Pier +
+  mini-swe-agent, through a local LiteLLM proxy.
+- **Standing:** **88/113 solved (77.9%)** for `gufo-qwen3.8-flash-next-tp2-q8`.
+  No jobs running. Git clean, `main` synced to `github.com/uv-genai/deepswe-run`.
+- **Pending:** the operator is about to **raise `--context` above 262,144** on the
+  gufo backend (strix-halo-1). After that: re-run the **6 context-wall victims**
+  (§5) → realistic path to ~94/113, then decide on the remaining ~19.
+- **First actions in a fresh session:** run the §8 preflight checklist, confirm the
+  operator's context change, then create/run the wall-victims batch (§5).
+
+---
+
+## 1. What this is
+
+- **Corpus:** `deep-swe/` — 113 Harbor-format tasks
+  (github.com/datacurve-ai/deep-swe), cloned locally.
+- **Runner:** `pier` (uv tool `datacurve-pier`, currently **0.3.1**) driving
+  `mini-swe-agent` 2.4.6 inside per-trial Docker containers.
+- **Model path:** mini-swe-agent → litellm client → (squid egress proxy:80/443) →
+  `172.17.0.1:80` (host relay container) → `127.0.0.1:4000` (LiteLLM proxy) →
+  backends (`strix-halo-1.local:8080` for gufo = TP2 across two Strix Halo boxes,
+  240 GB combined; `system76.local:8080` for the system76 models).
+- **Key metric:** `reward` = binary; 1 iff all fail-to-pass tests pass AND no
+  pass-to-pass test regresses. `f2p`/`p2p`/`partial` columns explain misses.
+
+## 2. Environment map (host: `system76`, Ubuntu)
+
+| Thing | Where / value |
+|---|---|
+| Working dir | `/home/ugo/projects/deepswe-test` |
+| LiteLLM proxy | systemd service **`litellm.service`** → `http://127.0.0.1:4000/v1`; config `~/software/litellm/litellm_config.yaml` — **OPERATOR-MANAGED. NEVER start/stop/restart this service yourself** (past incident; file edits only, on explicit request) |
+| Model backend (gufo) | `strix-halo-1.local:8080` (entry) — model is **TP2 split across two Strix Halo machines**. Port `:5809/metrics` exposes `llamacpp:*` gauges (`requests_processing`, `tokens_predicted_total`, `kv_cache_usage_ratio`); `:8080/metrics` = host resources |
+| Host name pin | `/etc/hosts` has `127.0.0.1 system76.local` + `nsswitch` has `files` first (mDNS returned flaky IPv6 — that's deliberate, backup `/etc/hosts.bak-deepswe`) |
+| Port-80 relay | container `deepswe-relay` (`--restart unless-stopped`): host `:80 → 127.0.0.1:4000`. Required because Pier's trial egress proxy (squid) **only allows ports 80/443** |
+| Trial base URL | **`OPENAI_BASE_URL=http://172.17.0.1/v1`** — never `127.0.0.1` (that's the container itself; this broke one full pilot once) |
+| litellm pin | Pier installs `mini-swe-agent --with "litellm==1.105.1"` (edited in `<pier>/site-packages/pier/agents/installed/mini_swe_agent.py`). **`uv tool upgrade datacurve-pier` wipes it** → run `./reapply-litellm-pin.sh` after any pier upgrade. Guarded by preflight in the scripts (README §3.5) |
+| Router settings (already applied) | `timeout: 600`, `num_retries: 1`, `cooldown_time: 120`, tpm removed from local models (backup `litellm_config.yaml.bak-20261018-2131`). Takes effect only on service restart — operator does that |
+
+## 3. Hard-won rules (each cost real downtime)
+
+1. **Docker address pools exhaust**: each trial creates 2 networks; killing Pier with
+   `pkill` skips `compose down` and leaks them → `all predefined address pools have
+   been fully subnetted`. All launch scripts now **auto-reclaim 0-container trial
+   networks + probe-create** before resuming. If resuming by hand, reclaim first.
+2. **Disk**: ~1.5–1.7 GB/task (images + build cache); full corpus ≈ 180 GB peak.
+   Reclaim after jobs: `./free-space.sh`. Readme §4.
+3. **Truncated `result.json`** (from disk-full eras) crashes `pier job resume` —
+   `rerun-failed-trials.sh` removes empty/corrupt ones; for crash-loop eras, error
+   trials are quarantined to `<job>/.infra-failed-backup/`.
+4. **infra vs model failure classification** (in `rerun-failed-trials.sh`):
+   `RuntimeError` always infra; `NonZero/AgentTimeout` only if `reward==0` AND the
+   agent log contains `InternalServerError`; `reward==1` never touched.
+5. **mini-swe's finish-line fragility**: a run that ends before its final `git
+   commit` yields an **empty `model.patch`** (collector = `git diff base HEAD`) →
+   base graded → 0. Fixed via `commit-incremental.yaml` (mandatory commit-after-
+   each-feature block, injected with `--ak config_yaml=…`). Any NEW job type should
+   include it — wrappers already do where relevant.
+6. **Never** let `pkill` patterns match your own shell (past self-kill twice); use
+   `pkill -f "^/home/ugo/.local/share/uv/tools/datacurve-pier/bin/python .*pier"`.
+   After any manual kill: the launch scripts' network-reclaim step covers the leak.
+
+## 4. Where things stand (results)
+
+Unique tasks solved: **66 (main) +1 arktype +3 zeros-rerun +8 failed13 +10 nearmiss = 88/113 (77.9%)**
+
+Remaining 25 (full detail in `reports/nearmiss-rerun-results-2026-10-24.md`):
+
+| Class | n | Tasks |
+|---|---|---|
+| **262k context-wall victims** | 6 | `gql-incremental-graphql-delivery`*, `ink-grid-box-layout`, `kea-atomic-signal-selectors`, `koota-composite-trait-aspects`, `sqlfmt-create-table-ddl-formatting`, `wasmi-trap-coredumps` |
+| f2p=100% but p2p regression | 2 | `bandit-structured-nosec-directives`, `gql-incremental` (*also wall victim) |
+| true near-misses 0.85–0.99 | 10 | fastapi-deprecation .99, httpx-streaming .99, koota-deferred .99, effect-sse .98, pest .96, csstree .96, awilix .96, httpx-multipart .95, mashumaro .95, obsidian-link .95 |
+| mid 0.25–0.88 | 4 | fastapi-implicit .88, termenv .86, prometheus-reload .67, pebble .25 |
+| hard zeros | 6 | kombu .013 (deliberate empty-diff judgment), koota-pair 0, meriyah 0, sqlfmt 0*, updo 0, ink-grid 0* |
+
+`--incremental` (commit config) has been used on failed13 + nearmiss batches; it
+flipped 8/13 zeros to solves. Whether earlier batches used it matters for
+comparability (job-name suffix `-inc` marks those).
+
+## 5. THE PENDING TASK — after the operator raises `--context`
+
+**Context:** gufo backend currently enforces `262144` tokens; 6 tasks died with
+`prompt exceeds the 262144-token context` (400 `context_length_exceeded`, retried
+~12× by the client). dynamodb was previously in this list but is **solved** now.
+
+**Step 1 — verify the operator's change:**
+```bash
+# config flag (on the backend host, operator's side): llama-server --context N
+# evidence from this host:
+journalctl -u litellm --since "2 hours ago" --no-pager | grep -c "prompt exceeds"   # should stop growing
+curl -s http://strix-halo-1.local:5809/metrics | grep -E "n_tokens_max|context"
+```
+
+**Step 2 — create the wall-victims batch.** The engine (`rerun-subset.sh`) supports
+groups `zeros | nearmiss | failed13`; add a group `wallvictims` whose list is:
+
+```
+gql-incremental-graphql-delivery
+ink-grid-box-layout
+kea-atomic-signal-selectors
+koota-composite-trait-aspects
+sqlfmt-create-table-ddl-formatting
+wasmi-trap-coredumps
+```
+
+Implementation note: simplest = a branch like `failed13`'s but with the 6 slugs
+hardcoded (or a static list file), launched with `--incremental` (wrapper style, see
+`rerun-failed13.sh`). Include the usual preflight (pin/relay/network-reclaim/
+warm-up) — already in the engine.
+
+**Step 3 — launch + watch:**
+```bash
+nohup ./rerun-wallvictims.sh > wallvictims-start.log 2>&1 &
+./scoreboard.sh jobs/<job-name>
+grep -m1 -c "Commit Incremental Work" jobs/<job>/*/agent/mini-swe-agent.txt   # =1 → config active
+```
+
+**Expected:** several of the 6 flip to solves → ~94/113. Caveats:
+- `gql-incremental` also breaks one p2p test every run — even past the wall it may
+  stay 0 until that regression disappears (attempt variance).
+- `kombu` (deliberate empty-diff) and the 0.85–0.99 near-miss group are separate
+  decisions afterward.
+
+**If a batch is wanted after that:** reuse `./rerun-nearmiss.sh --incremental`
+(latest-attempt-aware selection, computes live from job results) — it picks up
+anything unsolved with latest f2p ≥ 0.5 automatically.
+
+## 6. File inventory (repo root)
+
+| File | Purpose |
+|---|---|
+| `run_deepswe.sh` | full-corpus launcher (preflight: pin, relay, disk, warm-up; `-l/-t/-n/--seed`) |
+| `start-rerun.sh` | detached launcher wrapper → `rerun-failed-trials.sh` |
+| `rerun-failed-trials.sh` | resume-with-repair: quarantine infra-failed, network reclaim, concurrency edit (config+lock) |
+| `rerun-subset.sh` | engine for new jobs over task subsets; groups `zeros/nearmiss/failed13`, `--incremental`, `--dry`, `-n`, `MODEL=` |
+| `rerun-zeros.sh` / `rerun-nearmiss.sh` / `rerun-failed13.sh` | thin wrappers (failed13 forces `--incremental`) |
+| `commit-incremental.yaml` | full mini-swe config with commit-mandate (§3.5) |
+| `scoreboard.sh` | live results viewer (`./scoreboard.sh [job-dir] [-n s]`) |
+| `reapply-litellm-pin.sh` | re-pin litellm after pier upgrades (idempotent, fails safe) |
+| `free-space.sh` | reclaim per-trial images + cap build cache |
+| `resume.sh` | one-off legacy resume helper |
+| `reports/` | the two analysis reports (results of record) |
+| `README.md` | full setup docs (§3.x host setup, §3.5 pin, §4 disk, §6 troubleshooting) |
+| `.env` | base-URL/API-key (pier `--env-file`; scripts also export inline) |
+
+Job outputs under `jobs/` (gitignored); tarball backups in `archived-jobs/`
+(gitignored, local only).
+
+## 7. Cheat sheet
+
+```bash
+# full run (fresh corpus)
+./run_deepswe.sh <model> [-l N] [-t task] [-n C]
+
+# subset batches (new jobs)
+./rerun-zeros.sh [--dry] [-n N]                 # hard zeros, latest-attempt aware
+./rerun-nearmiss.sh --incremental               # near-misses >= 0.5 f2p
+./rerun-failed13.sh                             # the 13 zeros of zeros-rerun (+incremental)
+MODEL=... ./rerun-subset.sh <group> [--incremental] [--dry]
+
+# resume an interrupted job (safe after kills)
+./start-rerun.sh [-n N]        # or: ./rerun-failed-trials.sh [job] [-n N]
+
+# watch
+./scoreboard.sh                    # newest job: solved/graded, per-task f2p
+tail -f resume.log / <job>.log
+grep Traceback <job>.log           # must print nothing
+```
+
+Job naming: `deepswe-<model-slug>-<group>[-inc]` — `-inc` = incremental-commit config.
+Environment the scripts export: `OPENAI_API_BASE/BASE_URL=http://172.17.0.1/v1`,
+`OPENAI_API_KEY=sk-local`.
+
+## 8. Fresh-session preflight checklist
+
+```bash
+cd /home/ugo/projects/deepswe-test
+git status -s                         # expect clean
+systemctl is-active litellm           # active (operator's service; don't touch)
+docker ps --format '{{.Names}}' | grep deepswe-relay     # present
+grep -c 'litellm==1.105.1' /home/ugo/.local/share/uv/tools/datacurve-pier/lib/python3.13/site-packages/pier/agents/installed/mini_swe_agent.py   # 1 = pin intact
+ps aux | grep -F '/.local/bin/pier' | grep -v grep        # none = no job running
+curl -s -m 15 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:4000/v1/models   # 200
+# real chat gate (the one that matters) — any launch script does this too
+df -h / | tail -1                     # >= 60 GB free for a 13-task batch
+```
+
+If the operator says the context fix is done: go to §5.
+
+## 9. Operator interactions — standing agreements
+
+- The operator runs long jobs themselves with `nohup`; agent verifies launches via
+  log/bannner checks and watches via `scoreboard.sh` (no model probes unless asked —
+  probes show up on their dashboards).
+- **`litellm.service`, model backends, and server restarts are the operator's
+  domain** — never touch; config-file edits only on explicit request.
+- Near-miss/scoring reviews happen at explicit request; reports live in `reports/`
+  and get committed with results changes.
+- Commit messages so far document each incident (litellm 1.106.0, disk, subnet
+  pool) — keep that practice for new fixes.
