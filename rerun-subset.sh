@@ -5,10 +5,15 @@
 #   ./rerun-subset.sh zeros        [-n N] [--dry] [--incremental]
 #   ./rerun-subset.sh nearmiss     [-n N] [--dry] [--incremental]
 #   ./rerun-subset.sh failed13     [-n N] [--dry] [--incremental]
+#   ./rerun-subset.sh wallvictims  [-n N] [--dry] [--incremental]
 #
-#   zeros     reward=0 and f2p < 50%   (includes the ungraded verifier-timeout task)
-#   nearmiss  reward=0 and f2p >= 50%
-#   failed13  the 13 remaining zeros of the zeros-rerun job
+#   zeros       reward=0 and f2p < 50%   (includes the ungraded verifier-timeout task)
+#   nearmiss    reward=0 and f2p >= 50%
+#   failed13    the 13 remaining zeros of the zeros-rerun job
+#   wallvictims the 6 tasks that died on the 262144-token context wall
+#               (HANDOFF-20261024-1902.md §5; static list). Reruns only the ones
+#               that are still unsolved AND show progress: latest attempt
+#               f2p >= 0.5 (solved dropped; zeros like wasmi dropped)
 #   -n N      concurrent trials (default 1 = strictly serial model requests)
 #   --dry     compute + print everything, do not launch
 #   --incremental  inject commit-incremental.yaml (commit after each feature;
@@ -16,7 +21,11 @@
 #                  reports/zeros-rerun-analysis-2026-10-21.md)
 #   MODEL=... override the model (default gufo-qwen3.8-flash-next-tp2-q8)
 #
-# Normally invoked via the thin wrappers rerun-zeros.sh / rerun-nearmiss.sh.
+#   --tag T     append -T to the job name (e.g. --tag r2 -> ...-inc-r2),
+#               needed to rerun a group whose previous job dir already exists
+#
+# Normally invoked via the thin wrappers rerun-zeros.sh / rerun-nearmiss.sh /
+# rerun-failed13.sh / rerun-wallvictims.sh.
 set -euo pipefail
 
 REPO="/home/ugo/projects/deepswe-test"
@@ -27,22 +36,26 @@ MODEL_SLUG="${MODEL//\//_}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-GROUP="${1:-}"; [[ -n "$GROUP" ]] || die "usage: $0 zeros|nearmiss|failed13 [-n N] [--dry] [--incremental]"; shift || true
-N_CONC=1; DRY=0; INCR=0
+GROUP="${1:-}"; [[ -n "$GROUP" ]] || die "usage: $0 zeros|nearmiss|failed13|wallvictims [-n N] [--dry] [--incremental] [--tag T]"; shift || true
+N_CONC=1; DRY=0; INCR=0; TAG=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -n|--n-concurrent) N_CONC="$2"; shift 2 ;;
     --dry) DRY=1; shift ;;
     --incremental) INCR=1; shift ;;
+    --tag) TAG="$2"; shift 2 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
-[[ "$GROUP" == "zeros" || "$GROUP" == "nearmiss" || "$GROUP" == "failed13" ]] || die "group must be zeros, nearmiss or failed13"
+[[ "$GROUP" == "zeros" || "$GROUP" == "nearmiss" || "$GROUP" == "failed13" || "$GROUP" == "wallvictims" ]] \
+  || die "group must be zeros, nearmiss, failed13 or wallvictims"
 [[ "$N_CONC" =~ ^[0-9]+$ && "$N_CONC" -ge 1 ]] || die "invalid -n: $N_CONC"
 [[ -f "$MAIN/result.json" ]] || die "main job not found: $MAIN"
 
+[[ "$TAG" =~ ^[A-Za-z0-9._-]+$ ]] || { [[ -z "$TAG" ]] || die "invalid --tag: $TAG"; }
 JOB_NAME="deepswe-${MODEL_SLUG}-${GROUP}-rerun"
 [[ "$INCR" == "1" ]] && JOB_NAME+="-inc"
+[[ -n "$TAG" ]] && JOB_NAME+="-$TAG"
 LOG="$REPO/${JOB_NAME}.log"
 cd "$REPO"
 
@@ -51,7 +64,45 @@ if [[ "$INCR" == "1" && ! -f "$REPO/commit-incremental.yaml" ]]; then
 fi
 
 # ---------- compute task list ----------
-if [[ "$GROUP" == "failed13" ]]; then
+if [[ "$GROUP" == "wallvictims" ]]; then
+  # static list from HANDOFF §5 (context-wall victims), latest-attempt aware:
+  #   solved (reward=1)          -> drop
+  #   latest f2p < 0.5           -> drop (no progress yet, e.g. wasmi)
+  #   never graded               -> keep
+  mapfile -t TASKS < <(python3 - "$MODEL_SLUG" "$REPO/jobs" <<'PYEOF'
+import json, glob, os, sys
+model_slug, jobs_dir = sys.argv[1], sys.argv[2]
+WALL = [
+    'gql-incremental-graphql-delivery',
+    'ink-grid-box-layout',
+    'kea-atomic-signal-selectors',
+    'koota-composite-trait-aspects',
+    'sqlfmt-create-table-ddl-formatting',
+    'wasmi-trap-coredumps',
+]
+# latest attempt per slug across every same-model job
+latest = {}   # slug -> (mtime, reward, f2p|None)
+for rw in glob.glob(os.path.join(jobs_dir, f'deepswe-{model_slug}*/', '*/verifier/reward.json')):
+    if '/.infra-failed-backup/' in rw: continue
+    try:
+        d = os.path.dirname(os.path.dirname(rw))
+        slug = os.path.basename(json.load(open(d + '/config.json'))['task']['path'].rstrip('/'))
+        v = json.load(open(rw)); m = os.path.getmtime(rw)
+        if slug not in latest or m > latest[slug][0]:
+            latest[slug] = (m, v.get('reward', 0), v.get('f2p', 0.0))
+    except Exception: pass
+sel = []
+for s in WALL:
+    if s not in latest:
+        sel.append(s); continue          # never graded -> run
+    m, r, f = latest[s]
+    if r == 1: continue                  # solved already
+    if f is not None and f < 0.5: continue   # still zero progress
+    sel.append(s)
+print('\n'.join(sel))
+PYEOF
+  )
+elif [[ "$GROUP" == "failed13" ]]; then
   SOURCE_JOB="$REPO/jobs/deepswe-gufo-qwen3.8-flash-next-tp2-q8-zeros-rerun"
   [[ -d "$SOURCE_JOB" ]] || die "zeros-rerun job not found: $SOURCE_JOB"
   mapfile -t TASKS < <(python3 - "$SOURCE_JOB" "$MODEL_SLUG" <<'PYEOF'
