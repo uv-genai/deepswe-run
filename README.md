@@ -33,7 +33,7 @@ mini-swe-agent (in task container)
 ```
 
 The LiteLLM proxy (`~/software/litellm/litellm_config.yaml`) maps benchmark-facing model
-IDs (e.g. `system76/ornith-35b-q4`) to backend llama.cpp models. All models go through
+IDs (e.g. `gufo-qwen3.8-flash-next-tp2-q8`) to backend llama.cpp models. All models go through
 the same proxy, so switching models requires no wiring changes — only the `--model`
 argument changes.
 
@@ -82,7 +82,7 @@ systemctl status llama-swap           # verify
 >
 > ```bash
 > curl -s localhost:4000/v1/chat/completions -H 'Content-Type: application/json' \
->   -d '{"model":"system76/ornith-35b-q4","messages":[{"role":"user","content":"ping"}],"max_tokens":1}'
+>   -d '{"model":"gufo-qwen3.8-flash-next-tp2-q8","messages":[{"role":"user","content":"ping"}],"max_tokens":1}'
 > ```
 > First request after a cold start takes a while — llama-swap loads the GGUF into RAM.
 
@@ -122,7 +122,7 @@ Verify with real chat completions (not just `/v1/models`):
 for i in 1 2 3; do
   curl -s -o /dev/null -w "chat#$i -> %{http_code}\n" -m 120 \
     http://127.0.0.1:4000/v1/chat/completions -H 'Content-Type: application/json' \
-    -d '{"model":"system76/ornith-35b-q4","messages":[{"role":"user","content":"ping"}],"max_tokens":1}'
+    -d '{"model":"gufo-qwen3.8-flash-next-tp2-q8","messages":[{"role":"user","content":"ping"}],"max_tokens":1}'
 done   # must be 200,200,200
 ```
 
@@ -193,7 +193,7 @@ detects it and prints the candidate lines instead of guessing — apply the
 cd /home/ugo/projects/deepswe-test
 
 ./scripts/run_deepswe.sh --list                     # models available on the proxy
-./scripts/run_deepswe.sh system76/ornith-35b-q4     # full 113-task run
+./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8     # full 113-task run
 ```
 
 Script flags:
@@ -214,14 +214,14 @@ trial 1 doesn't burn budget on GGUF loading, then launches Pier. Non-interactive
 auto-detaches; for a run you want to survive terminal close:
 
 ```bash
-nohup ./scripts/run_deepswe.sh system76/ornith-35b-q4 -n 3 > log/launcher.log 2>&1 &
+nohup ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8 -n 2 > log/launcher.log 2>&1 &
 ```
 
 Each model gets its own job namespace: log `log/deepswe-<model>.log`, results under
 `jobs/deepswe-<model>/`, so runs for different models never clobber each other.
 
 **Recommended first run:** a pilot —
-`./scripts/run_deepswe.sh system76/ornith-35b-q4 -l 5 --seed 0`.
+`./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8 -l 5 --seed 0`.
 
 ### Concurrency guidance
 

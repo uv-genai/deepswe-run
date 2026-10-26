@@ -3,9 +3,9 @@
 #
 # Usage:
 #   ./scripts/run_deepswe.sh --list                      # list models available on the proxy
-#   ./scripts/run_deepswe.sh system76/ornith-35b-q4      # full 113-task run
-#   ./scripts/run_deepswe.sh system76/ornith-35b-q4 -l 5 --seed 0     # 5-task pilot
-#   ./scripts/run_deepswe.sh system76/ornith-35b-q4 -n 2 -t bandit-incremental-cache-control
+#   ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8      # full 113-task run
+#   ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8 -l 5 --seed 0     # 5-task pilot
+#   ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8 -n 2 -t bandit-incremental-cache-control
 #
 # Flags:
 #   --list            List models served by the proxy and exit
