@@ -205,6 +205,9 @@ Script flags:
 | `-s, --seed N` | sampling seed (with `--n-tasks`) | 0 |
 | `-t, --task ID` | run a single task (directory name under `deep-swe/tasks/`) | — |
 | `-n, --n-concurrent N`, `--concurrency N` | parallel trials | 3 |
+| `-j, --job-name NAME` | explicit job name (must not already exist in `jobs/`) | derived from model/task |
+| `-c, --config FILE` | inject a mini-swe agent YAML (e.g. `commit-incremental.yaml`) via `--ak config_yaml=…`; with no `-j` the job name gets `-cfg-<basename>` | **stock** mini-swe config |
+| `-d, --dry` | print the exact `pier` command and exit (no warm-up, no launch) | — |
 | `-w, --no-warmup` | skip the warm-up request that loads the model | warm up |
 | `-h, --help` | usage | — |
 

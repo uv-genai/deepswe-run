@@ -7,6 +7,7 @@
 #   ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8 -l 5 --seed 0     # 5-task pilot
 #   ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8 -n 2 -t bandit-incremental-cache-control
 #   ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8 -j deepswe-...-leaderboard   # custom job name
+#   ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8 -c commit-incremental.yaml    # inject agent config
 #
 # Flags:
 #   --list            List models served by the proxy and exit
@@ -15,6 +16,11 @@
 #   -s, --seed N      Sampling seed for --n-tasks (default: 0)
 #   -t, --task ID     Run a single task by directory name instead of the corpus
 #   -j, --job-name NAME   Override the derived job name (jobs/NAME must not exist)
+#   -c, --config FILE Inject a mini-swe agent YAML (e.g. commit-incremental.yaml) as
+#                     --ak config_yaml=<contents>; default = stock mini-swe config.
+#                     With no -j, the job name gets -cfg-<basename> so stock and
+#                     configured jobs never share a namespace.
+#   -d, --dry         Build the pier command, print it, exit (no warm-up, no launch)
 #   -w, --no-warmup   Skip the warm-up request that forces llama-swap to load the model
 #   -h, --help        Show this help
 set -euo pipefail
@@ -34,7 +40,7 @@ usage() { sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; }
 
 # ---------- args ----------
 MODEL=""
-LIST=0; N_TASKS=""; N_CONC=3; SEED=0; TASK=""; WARMUP=1; JOB_OVERRIDE=""
+LIST=0; N_TASKS=""; N_CONC=3; SEED=0; TASK=""; WARMUP=1; JOB_OVERRIDE=""; CFG=""; DRY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --list) LIST=1; shift ;;
@@ -43,6 +49,8 @@ while [[ $# -gt 0 ]]; do
     -s|--seed) SEED="$2"; shift 2 ;;
     -t|--task) TASK="$2"; shift 2 ;;
     -j|--job-name) JOB_OVERRIDE="$2"; shift 2 ;;
+    -c|--config) CFG="$2"; shift 2 ;;
+    -d|--dry) DRY=1; WARMUP=0; shift ;;
     -w|--no-warmup) WARMUP=0; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) die "unknown flag: $1 (see --help)" ;;
@@ -59,6 +67,10 @@ if [[ $LIST == 1 ]]; then
 fi
 
 [[ -n "$MODEL" ]] || { usage; echo; die "model name is required (try: ./scripts/run_deepswe.sh --list)"; }
+if [[ -n "$CFG" ]]; then
+  [[ -f "$CFG" ]] || die "agent config not found: $CFG"
+  [[ -r "$CFG" ]] || die "agent config not readable: $CFG"
+fi
 command -v pier >/dev/null || die "pier not on PATH (uv tool install datacurve-pier)"
 MSA=$(ls -1 /home/ugo/.local/share/uv/tools/datacurve-pier/lib/python*/site-packages/pier/agents/installed/mini_swe_agent.py 2>/dev/null | head -1)
 if [[ -n "$MSA" ]] && ! grep -q 'litellm==1.105.1' "$MSA"; then
@@ -104,6 +116,11 @@ MODEL_SLUG="${MODEL//\//_}"
 JOB_NAME="deepswe-${MODEL_SLUG}"
 [[ -n "$TASK" ]] && JOB_NAME="${JOB_NAME}-${TASK}"
 [[ -n "$N_TASKS" ]] && JOB_NAME="${JOB_NAME}-n${N_TASKS}-s${SEED}"
+if [[ -n "$CFG" && -z "$JOB_OVERRIDE" ]]; then
+  # keep configured jobs out of the stock namespace (results must stay separable)
+  CFG_TAG=$(basename "$CFG" .yaml | tr -cd 'A-Za-z0-9._-')
+  JOB_NAME="${JOB_NAME}-cfg-${CFG_TAG}"
+fi
 [[ -n "$JOB_OVERRIDE" ]] && JOB_NAME="$JOB_OVERRIDE"
 # never clobber an existing job (results of record live in jobs/<name>/)
 if [[ -d "${REPO_DIR}/jobs/${JOB_NAME}" ]]; then
@@ -112,6 +129,9 @@ fi
 
 CMD=(pier run --agent mini-swe-agent --model "openai/${MODEL}"
      --job-name "$JOB_NAME" --n-concurrent "$N_CONC" -y)
+if [[ -n "$CFG" ]]; then
+  CMD+=(--ak "config_yaml=$(cat "$CFG")")
+fi
 if [[ -n "$TASK" ]]; then
   [[ -d "$TASKS_DIR/$TASK" ]] || die "unknown task: $TASK (ls $TASKS_DIR)"
   CMD+=(-p "$TASKS_DIR/$TASK")
@@ -122,6 +142,11 @@ fi
 
 echo "Job:    $JOB_NAME"
 echo "Model:  openai/${MODEL}"
+if [[ -n "$CFG" ]]; then
+  echo "Agent config: $CFG  (injected: --ak config_yaml=...)"
+else
+  echo "Agent config: stock mini-swe (no -c given)"
+fi
 echo "Tasks:  ${TASK:-${N_TASKS:-all 113}}${N_TASKS:+ (seed $SEED)}"
 echo "Concurrent trials: $N_CONC"
 echo "Log:    ${REPO_DIR}/log/${JOB_NAME}.log"
@@ -129,6 +154,11 @@ echo "Results:${REPO_DIR}/jobs/${JOB_NAME}/"
 echo
 echo "Running: ${CMD[*]}"
 echo
+
+if [[ $DRY == 1 ]]; then
+  echo "--dry: nothing launched, no warm-up sent"
+  exit 0
+fi
 
 cd "$REPO_DIR"
 if [[ -t 0 && -t 1 ]]; then
@@ -142,5 +172,6 @@ else
   sleep 5
   kill -0 "$PID" 2>/dev/null || { tail -20 "${REPO_DIR}/log/${JOB_NAME}.log"; die "pier exited immediately"; }
   echo "Started (PID $PID). Follow with: tail -f log/${JOB_NAME}.log"
+  [[ -n "$CFG" ]] && echo "Config check: first trial's log header should list custom.yaml in the config specs"
   echo "Inspect later with: pier view jobs"
 fi
