@@ -3,8 +3,8 @@
 # breakage, re-queue all trials poisoned by "No module named 'mcp'" plus whatever
 # was still pending when the run was killed.
 #
-#   ./rerun-failed-trials.sh                       # default: the gufo job
-#   ./rerun-failed-trials.sh jobs/<other-job-dir>  # another job
+#   ./scripts/rerun-failed-trials.sh                       # default: the gufo job
+#   ./scripts/rerun-failed-trials.sh jobs/<other-job-dir>  # another job
 #
 # What it does:
 #   1. preflight: pier not running, litellm pin present in pier, relay up,
@@ -17,7 +17,7 @@
 #      base URL, then verifies it started cleanly
 set -euo pipefail
 
-#   ./rerun-failed-trials.sh [job-dir] [-n N]
+#   ./scripts/rerun-failed-trials.sh [job-dir] [-n N]
 #
 #   -n N   set trial concurrency to N before resuming (Pier has no -n on
 #          resume; both config.json and lock.json must be changed together or
@@ -39,7 +39,8 @@ JOB="${JOB:-jobs/deepswe-gufo-qwen3.8-flash-next-tp2-q8}"
 case "$JOB" in /*) ;; *) JOB="$REPO/$JOB" ;; esac
 MCP_MARKER="No module named 'mcp'"
 PIER_MSA="/home/ugo/.local/share/uv/tools/datacurve-pier/lib/python3.13/site-packages/pier/agents/installed/mini_swe_agent.py"
-LOG="$REPO/resume.log"
+mkdir -p "$REPO/log"
+LOG="$REPO/log/resume.log"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -49,7 +50,7 @@ cd "$REPO"
 [[ -f "$JOB/config.json" ]] || die "not a job dir: $JOB"
 pgrep -f "bin/python .*pier (run|job resume)" >/dev/null && die "a pier job is already running - stop it first"
 grep -q 'litellm==1.105.1' "$PIER_MSA" 2>/dev/null \
-  || die "litellm pin missing from pier ($PIER_MSA) - run ./reapply-litellm-pin.sh first (README §3.5)"
+  || die "litellm pin missing from pier ($PIER_MSA) - run ./scripts/reapply-litellm-pin.sh first (README §3.5)"
 
 # reclaim leaked trial networks: pkill'ing pier skips compose down, and Docker's
 # address pools are finite -> 'all predefined address pools have been fully subnetted'
@@ -181,6 +182,6 @@ fi
 echo
 echo "running. Watch with:"
 echo "  tail -f ${LOG#"$REPO/"}/"
-echo "  ./scoreboard.sh $JOB"
+echo "  ./scripts/scoreboard.sh $JOB"
 echo
 echo "kept (already graded) trials are unchanged; re-queued = mcp-broken + killed + pending."

@@ -173,7 +173,7 @@ uv tool install mini-swe-agent{version_spec} --with "litellm==1.105.1"
   wipes this edit.** After any pier upgrade, before any run:
 
 ```bash
-./reapply-litellm-pin.sh     # idempotent; verifies the edit parses; fails safe
+./scripts/reapply-litellm-pin.sh     # idempotent; verifies the edit parses; fails safe
 ```
 
   Both `run_deepswe.sh` (warm-up) and `rerun-failed-trials.sh` (preflight) abort
@@ -192,8 +192,8 @@ detects it and prints the candidate lines instead of guessing — apply the
 ```bash
 cd /home/ugo/projects/deepswe-test
 
-./run_deepswe.sh --list                     # models available on the proxy
-./run_deepswe.sh system76/ornith-35b-q4     # full 113-task run
+./scripts/run_deepswe.sh --list                     # models available on the proxy
+./scripts/run_deepswe.sh system76/ornith-35b-q4     # full 113-task run
 ```
 
 Script flags:
@@ -214,14 +214,14 @@ trial 1 doesn't burn budget on GGUF loading, then launches Pier. Non-interactive
 auto-detaches; for a run you want to survive terminal close:
 
 ```bash
-nohup ./run_deepswe.sh system76/ornith-35b-q4 -n 3 > launcher.log 2>&1 &
+nohup ./scripts/run_deepswe.sh system76/ornith-35b-q4 -n 3 > log/launcher.log 2>&1 &
 ```
 
-Each model gets its own job namespace: log `deepswe-<model>.log`, results under
+Each model gets its own job namespace: log `log/deepswe-<model>.log`, results under
 `jobs/deepswe-<model>/`, so runs for different models never clobber each other.
 
 **Recommended first run:** a pilot —
-`./run_deepswe.sh system76/ornith-35b-q4 -l 5 --seed 0`.
+`./scripts/run_deepswe.sh system76/ornith-35b-q4 -l 5 --seed 0`.
 
 ### Concurrency guidance
 
@@ -280,7 +280,7 @@ nohup pier run -p deep-swe/tasks \
   --env-file .env \
   --job-name deepswe-<model-id> \
   --n-concurrent 3 \
-  -y > deepswe-<model-id>.log 2>&1 &
+  -y > log/deepswe-<model-id>.log 2>&1 &
 ```
 
 Task timeouts are generous: 3 h agent + 30 min verifier + 30 min build per task. A
@@ -291,9 +291,9 @@ full local-model run takes **multiple days**.
 ## 5. Monitoring & results
 
 ```bash
-tail -f deepswe-<model>.log     # live job log
-./scoreboard.sh                  # live scoreboard (newest job; auto-refresh 30s)
-./scoreboard.sh jobs/<job-name>  # specific job
+tail -f log/deepswe-<model>.log     # live job log
+./scripts/scoreboard.sh                  # live scoreboard (newest job; auto-refresh 30s)
+./scripts/scoreboard.sh jobs/<job-name>  # specific job
 pier view jobs                  # web UI over all job trajectories (127.0.0.1:8080+)
 ```
 
@@ -343,14 +343,14 @@ done
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Agent log fills with `litellm.APIConnectionError ... No module named 'mcp'`, trials finish in ~5 min with reward 0 / f2p 0 | unpinned litellm resolved to a broken release at image build (e.g. 1.106.0) — **not** a model failure | `./reapply-litellm-pin.sh` (§3.5), then re-run the affected trials with `./rerun-failed-trials.sh` |
-| After `uv tool upgrade datacurve-pier`, new trials fail with the mcp error | upgrade wiped the litellm pin | `./reapply-litellm-pin.sh` (§3.5) |
+| Agent log fills with `litellm.APIConnectionError ... No module named 'mcp'`, trials finish in ~5 min with reward 0 / f2p 0 | unpinned litellm resolved to a broken release at image build (e.g. 1.106.0) — **not** a model failure | `./scripts/reapply-litellm-pin.sh` (§3.5), then re-run the affected trials with `./scripts/rerun-failed-trials.sh` |
+| After `uv tool upgrade datacurve-pier`, new trials fail with the mcp error | upgrade wiped the litellm pin | `./scripts/reapply-litellm-pin.sh` (§3.5) |
 | Trials die mid-run; dockerd logs `no space left on device` | disk full — images + build cache accumulate ~1.7 GB/task | reclaim (§4 "Disk space"), resume the job |
 | `pier job resume` crashes: `ValidationError ... EOF while parsing a value` | disk-full crash left 0-byte `result.json` files | `rm` the empty `*/result.json` files, then resume (trials re-run) |
 | All trials error `NonZeroAgentExitCodeError`; agent log ends in `litellm.InternalServerError ... [Errno 111] Connection refused` | proxy's backend name resolves to a dead address (mDNS flake) — `/v1/models` still 200s, so preflight passes | pin `system76.local` (§3.3), re-run |
 | All LLM calls fail: `litellm.InternalServerError ... Connection error` | LiteLLM proxy's backend on :8080 not running | `systemctl start llama-swap` |
 | Script aborts: `deepswe-relay container is down` | relay missing | recreate it (§3.2) |
-| Script aborts: `model '...' not served` | typo or model removed from LiteLLM config | `./run_deepswe.sh --list` |
+| Script aborts: `model '...' not served` | typo or model removed from LiteLLM config | `./scripts/run_deepswe.sh --list` |
 | Image pulls fail mid-run | disk full (images are multi-GB) | `docker system df`; `docker system prune` |
 | Trials hang / OOM kills | concurrency too high for RAM | lower `-n`; check `free -g`, `docker stats` |
 | Verifier errors about network | expected — verifiers run with `no-network`; only the agent needs the proxy | — |
@@ -366,15 +366,33 @@ Upstream task/verifier issues belong to
 ## 7. Files in this directory
 
 ```
-run_deepswe.sh           benchmark launcher (preflight + warm-up + pier run)
-scoreboard.sh            live results viewer for a running job
-rerun-failed-trials.sh   quarantine mcp-poisoned trials + resume the job
-reapply-litellm-pin.sh   re-pin litellm after a pier upgrade (§3.5)
-free-space.sh            reclaim per-trial docker images + build cache
-resume.sh                one-off: resume the interrupted gufo job
+scripts/                    all runnable scripts (invoke from the repo root):
+  run_deepswe.sh              benchmark launcher (preflight + warm-up + pier run)
+  scoreboard.sh               live results viewer for a running job
+  rerun-subset.sh             engine for subset batches (zeros/nearmiss/failed13/wallvictims)
+  rerun-zeros.sh              thin wrappers -> rerun-subset.sh
+  rerun-nearmiss.sh             "
+  rerun-failed13.sh             "  (forces --incremental)
+  rerun-wallvictims.sh          "  (forces --incremental)
+  rerun-failed-trials.sh      quarantine mcp-poisoned trials + resume the job
+  start-rerun.sh              detached launcher -> rerun-failed-trials.sh
+  reapply-litellm-pin.sh      re-pin litellm after a pier upgrade (§3.5)
+  free-space.sh               reclaim per-trial docker images + build cache
+  resume.sh                   one-off: resume the interrupted gufo job
+  run-deepswe-miny.py         helper: generate deepswe-mini test cases
+log/                      every run/batch log (gitignored): job logs
+                         deepswe-<model>[-batch].log, launch logs *-start.log,
+                         resume.log (+ .prev), tunnel logs
 .env                     base-URL/API-key env passed to pier
 deep-swe/                benchmark corpus (113 tasks), cloned from GitHub
+commit-incremental.yaml  agent config with commit-mandate (used via --incremental)
 jobs/                    per-job results (pier output); .infra-failed-backup/
                          inside a job holds quarantined infra-failed trials
-resume.log               output of the running `pier job resume` (.prev = last one)
+reports/                 analysis + final report (results of record)
+HANDOFF-*.md             session-restart handoff (dated snapshot)
 ```
+
+> Layout note (2026-10-26): scripts were moved from the repo root into
+> `scripts/` and all run logs into `log/`. Paths inside every script, this
+> README, and the launch/watch instructions were updated accordingly; the
+> dated `HANDOFF-*.md` still shows the old layout.

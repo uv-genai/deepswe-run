@@ -2,10 +2,10 @@
 # Engine for the post-completion re-runs: launches a NEW pier job over a task
 # subset computed from the finished main job.
 #
-#   ./rerun-subset.sh zeros        [-n N] [--dry] [--incremental]
-#   ./rerun-subset.sh nearmiss     [-n N] [--dry] [--incremental]
-#   ./rerun-subset.sh failed13     [-n N] [--dry] [--incremental]
-#   ./rerun-subset.sh wallvictims  [-n N] [--dry] [--incremental]
+#   ./scripts/rerun-subset.sh zeros        [-n N] [--dry] [--incremental]
+#   ./scripts/rerun-subset.sh nearmiss     [-n N] [--dry] [--incremental]
+#   ./scripts/rerun-subset.sh failed13     [-n N] [--dry] [--incremental]
+#   ./scripts/rerun-subset.sh wallvictims  [-n N] [--dry] [--incremental]
 #
 #   zeros       reward=0 and f2p < 50%   (includes the ungraded verifier-timeout task)
 #   nearmiss    reward=0 and f2p >= 50%
@@ -25,7 +25,7 @@
 #               needed to rerun a group whose previous job dir already exists
 #
 # Normally invoked via the thin wrappers rerun-zeros.sh / rerun-nearmiss.sh /
-# rerun-failed13.sh / rerun-wallvictims.sh.
+# rerun-failed13.sh / rerun-wallvictims.sh (all in scripts/).
 set -euo pipefail
 
 REPO="/home/ugo/projects/deepswe-test"
@@ -56,7 +56,8 @@ done
 JOB_NAME="deepswe-${MODEL_SLUG}-${GROUP}-rerun"
 [[ "$INCR" == "1" ]] && JOB_NAME+="-inc"
 [[ -n "$TAG" ]] && JOB_NAME+="-$TAG"
-LOG="$REPO/${JOB_NAME}.log"
+mkdir -p "$REPO/log"
+LOG="$REPO/log/${JOB_NAME}.log"
 cd "$REPO"
 
 if [[ "$INCR" == "1" && ! -f "$REPO/commit-incremental.yaml" ]]; then
@@ -165,7 +166,7 @@ printf '  %s\n' "${TASKS[@]}"
 # ---------- preflight ----------
 pgrep -f "bin/python .*pier (run|job resume)" >/dev/null && die "a pier job is already running - wait for it (or let the sequential plan finish)"
 grep -q 'litellm==1.105.1' "$PIER_MSA" 2>/dev/null \
-  || die "litellm pin missing from pier - run ./reapply-litellm-pin.sh first (README §3.5)"
+  || die "litellm pin missing from pier - run ./scripts/reapply-litellm-pin.sh first (README §3.5)"
 docker ps --format '{{.Names}}' | grep -q '^deepswe-relay$' || die "deepswe-relay container is down (README §3.2)"
 
 # reclaim leaked trial networks + pool probe (pkill'd pier runs leak them)
@@ -211,5 +212,5 @@ if grep -q "Traceback\|ValueError" "$LOG" 2>/dev/null || ! kill -0 "$PIER_PID" 2
 fi
 echo "running. Watch with:"
 echo "  tail -f ${LOG#"$REPO/"}/"
-echo "  ./scoreboard.sh jobs/$JOB_NAME"
+echo "  ./scripts/scoreboard.sh jobs/$JOB_NAME"
 [[ "$INCR" == "1" ]] && echo "(commit-incremental config active: first trial's log header should show custom.yaml in the config specs)"

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Live scoreboard for a running (or finished) DeepSWE pier job.
 #
-#   ./scoreboard.sh                              # newest job in jobs/
-#   ./scoreboard.sh jobs/deepswe-gufo-...        # specific job dir
-#   ./scoreboard.sh jobs/deepswe-gufo-... -n 10  # refresh every 10s (default 30)
+#   ./scripts/scoreboard.sh                              # newest job in jobs/
+#   ./scripts/scoreboard.sh jobs/deepswe-gufo-...        # specific job dir
+#   ./scripts/scoreboard.sh jobs/deepswe-gufo-... -n 10  # refresh every 10s (default 30)
 set -euo pipefail
 
 JOB="${1:-}"
@@ -18,7 +18,7 @@ for a in "$@"; do
   esac
 done
 [[ $# -ge 2 && "$1" != -* && "$2" == "-n" ]] && REFRESH="$3"
-[[ -z "$JOB" ]] && JOB=$(ls -td "$(dirname "$0")"/jobs/*/ 2>/dev/null | head -1)
+[[ -z "$JOB" ]] && JOB=$(ls -td "$(dirname "$0")"/../jobs/*/ 2>/dev/null | head -1)
 JOB="${JOB%/}"
 [[ -f "$JOB/result.json" ]] || { echo "no result.json in $JOB" >&2; exit 1; }
 

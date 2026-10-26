@@ -2,10 +2,10 @@
 # Run the DeepSWE benchmark against any model served by the local LiteLLM proxy.
 #
 # Usage:
-#   ./run_deepswe.sh --list                      # list models available on the proxy
-#   ./run_deepswe.sh system76/ornith-35b-q4      # full 113-task run
-#   ./run_deepswe.sh system76/ornith-35b-q4 -l 5 --seed 0     # 5-task pilot
-#   ./run_deepswe.sh system76/ornith-35b-q4 -n 2 -t bandit-incremental-cache-control
+#   ./scripts/run_deepswe.sh --list                      # list models available on the proxy
+#   ./scripts/run_deepswe.sh system76/ornith-35b-q4      # full 113-task run
+#   ./scripts/run_deepswe.sh system76/ornith-35b-q4 -l 5 --seed 0     # 5-task pilot
+#   ./scripts/run_deepswe.sh system76/ornith-35b-q4 -n 2 -t bandit-incremental-cache-control
 #
 # Flags:
 #   --list            List models served by the proxy and exit
@@ -55,11 +55,11 @@ if [[ $LIST == 1 ]]; then
   exit 0
 fi
 
-[[ -n "$MODEL" ]] || { usage; echo; die "model name is required (try: ./run_deepswe.sh --list)"; }
+[[ -n "$MODEL" ]] || { usage; echo; die "model name is required (try: ./scripts/run_deepswe.sh --list)"; }
 command -v pier >/dev/null || die "pier not on PATH (uv tool install datacurve-pier)"
 MSA=$(ls -1 /home/ugo/.local/share/uv/tools/datacurve-pier/lib/python*/site-packages/pier/agents/installed/mini_swe_agent.py 2>/dev/null | head -1)
 if [[ -n "$MSA" ]] && ! grep -q 'litellm==1.105.1' "$MSA"; then
-  die "litellm pin missing from pier (upgraded?) - run: ./reapply-litellm-pin.sh (README §3.5)"
+  die "litellm pin missing from pier (upgraded?) - run: ./scripts/reapply-litellm-pin.sh (README §3.5)"
 fi
 [[ -d "$TASKS_DIR" ]] || die "tasks dir not found: $TASKS_DIR (git clone https://github.com/datacurve-ai/deep-swe.git)"
 
@@ -76,7 +76,7 @@ curl -sf "${PROXY_BASE}/v1/models" >/dev/null \
 
 curl -sf "${PROXY_BASE}/v1/models" | grep -q "\"id\":\"${MODEL}\"" \
   || die "model '${MODEL}' not served by the proxy. Available:
-$(./run_deepswe.sh --list)"
+$("$(dirname "$0")/run_deepswe.sh" --list)"
 
 FREE_GB=$(df -BG --output=avail "$REPO_DIR" | tail -1 | tr -dc '0-9')
 [[ "${FREE_GB:-0}" -ge 40 ]] \
@@ -128,10 +128,11 @@ if [[ -t 0 && -t 1 ]]; then
   exec "${CMD[@]}"
 else
   # nohup/background: detach with logs
-  nohup "${CMD[@]}" > "${JOB_NAME}.log" 2>&1 &
+  mkdir -p "${REPO_DIR}/log"
+  nohup "${CMD[@]}" > "${REPO_DIR}/log/${JOB_NAME}.log" 2>&1 &
   PID=$!
   sleep 5
-  kill -0 "$PID" 2>/dev/null || { tail -20 "${JOB_NAME}.log"; die "pier exited immediately"; }
-  echo "Started (PID $PID). Follow with: tail -f ${JOB_NAME}.log"
+  kill -0 "$PID" 2>/dev/null || { tail -20 "${REPO_DIR}/log/${JOB_NAME}.log"; die "pier exited immediately"; }
+  echo "Started (PID $PID). Follow with: tail -f log/${JOB_NAME}.log"
   echo "Inspect later with: pier view jobs"
 fi
