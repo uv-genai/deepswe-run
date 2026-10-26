@@ -6,6 +6,7 @@
 #   ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8      # full 113-task run
 #   ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8 -l 5 --seed 0     # 5-task pilot
 #   ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8 -n 2 -t bandit-incremental-cache-control
+#   ./scripts/run_deepswe.sh gufo-qwen3.8-flash-next-tp2-q8 -j deepswe-...-leaderboard   # custom job name
 #
 # Flags:
 #   --list            List models served by the proxy and exit
@@ -13,6 +14,7 @@
 #   -n, --n-concurrent N, --concurrency N   Parallel trials (default: 3; each container capped at 8G)
 #   -s, --seed N      Sampling seed for --n-tasks (default: 0)
 #   -t, --task ID     Run a single task by directory name instead of the corpus
+#   -j, --job-name NAME   Override the derived job name (jobs/NAME must not exist)
 #   -w, --no-warmup   Skip the warm-up request that forces llama-swap to load the model
 #   -h, --help        Show this help
 set -euo pipefail
@@ -28,11 +30,11 @@ WARMUP_TIMEOUT=600
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; }
 
 # ---------- args ----------
 MODEL=""
-LIST=0; N_TASKS=""; N_CONC=3; SEED=0; TASK=""; WARMUP=1
+LIST=0; N_TASKS=""; N_CONC=3; SEED=0; TASK=""; WARMUP=1; JOB_OVERRIDE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --list) LIST=1; shift ;;
@@ -40,6 +42,7 @@ while [[ $# -gt 0 ]]; do
     -n|--n-concurrent|--concurrency) N_CONC="$2"; shift 2 ;;
     -s|--seed) SEED="$2"; shift 2 ;;
     -t|--task) TASK="$2"; shift 2 ;;
+    -j|--job-name) JOB_OVERRIDE="$2"; shift 2 ;;
     -w|--no-warmup) WARMUP=0; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) die "unknown flag: $1 (see --help)" ;;
@@ -101,6 +104,11 @@ MODEL_SLUG="${MODEL//\//_}"
 JOB_NAME="deepswe-${MODEL_SLUG}"
 [[ -n "$TASK" ]] && JOB_NAME="${JOB_NAME}-${TASK}"
 [[ -n "$N_TASKS" ]] && JOB_NAME="${JOB_NAME}-n${N_TASKS}-s${SEED}"
+[[ -n "$JOB_OVERRIDE" ]] && JOB_NAME="$JOB_OVERRIDE"
+# never clobber an existing job (results of record live in jobs/<name>/)
+if [[ -d "${REPO_DIR}/jobs/${JOB_NAME}" ]]; then
+  die "jobs/${JOB_NAME} already exists - pick another -j name (protects previous results)"
+fi
 
 CMD=(pier run --agent mini-swe-agent --model "openai/${MODEL}"
      --job-name "$JOB_NAME" --n-concurrent "$N_CONC" -y)
@@ -116,7 +124,7 @@ echo "Job:    $JOB_NAME"
 echo "Model:  openai/${MODEL}"
 echo "Tasks:  ${TASK:-${N_TASKS:-all 113}}${N_TASKS:+ (seed $SEED)}"
 echo "Concurrent trials: $N_CONC"
-echo "Log:    ${REPO_DIR}/${JOB_NAME}.log"
+echo "Log:    ${REPO_DIR}/log/${JOB_NAME}.log"
 echo "Results:${REPO_DIR}/jobs/${JOB_NAME}/"
 echo
 echo "Running: ${CMD[*]}"
