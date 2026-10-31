@@ -6,6 +6,7 @@
 #   ./scripts/rerun-subset.sh nearmiss     [-n N] [--dry] [--incremental]
 #   ./scripts/rerun-subset.sh failed13     [-n N] [--dry] [--incremental]
 #   ./scripts/rerun-subset.sh wallvictims  [-n N] [--dry] [--incremental]
+#   ./scripts/rerun-subset.sh failed23     [-n N] [--dry] [--incremental]
 #
 #   zeros       reward=0 and f2p < 50%   (includes the ungraded verifier-timeout task)
 #   nearmiss    reward=0 and f2p >= 50%
@@ -14,6 +15,11 @@
 #               (HANDOFF-20261024-1902.md §5; static list). Reruns only the ones
 #               that are still unsolved AND show progress: latest attempt
 #               f2p >= 0.5 (solved dropped; zeros like wasmi dropped)
+#   failed23    the 23-task residual set of the gufo campaign
+#               (reports/final-report-2026-10-26.md §3/Appendix A; static list).
+#               Drops tasks the CURRENT MODEL already scored reward=1 on, so it is
+#               model-agnostic: MODEL=maya-glm5-s-tp2 ./scripts/rerun-subset.sh
+#               failed23 --incremental  -> one column of the maya-campaign matrix
 #   -n N      concurrent trials (default 1 = strictly serial model requests)
 #   --dry     compute + print everything, do not launch
 #   --incremental  inject commit-incremental.yaml (commit after each feature;
@@ -36,7 +42,7 @@ MODEL_SLUG="${MODEL//\//_}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-GROUP="${1:-}"; [[ -n "$GROUP" ]] || die "usage: $0 zeros|nearmiss|failed13|wallvictims [-n N] [--dry] [--incremental] [--tag T]"; shift || true
+GROUP="${1:-}"; [[ -n "$GROUP" ]] || die "usage: $0 zeros|nearmiss|failed13|wallvictims|failed23 [-n N] [--dry] [--incremental] [--tag T]"; shift || true
 N_CONC=1; DRY=0; INCR=0; TAG=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -47,8 +53,8 @@ while [[ $# -gt 0 ]]; do
     *) die "unknown argument: $1" ;;
   esac
 done
-[[ "$GROUP" == "zeros" || "$GROUP" == "nearmiss" || "$GROUP" == "failed13" || "$GROUP" == "wallvictims" ]] \
-  || die "group must be zeros, nearmiss, failed13 or wallvictims"
+[[ "$GROUP" == "zeros" || "$GROUP" == "nearmiss" || "$GROUP" == "failed13" || "$GROUP" == "wallvictims" || "$GROUP" == "failed23" ]] \
+  || die "group must be zeros, nearmiss, failed13, wallvictims or failed23"
 [[ "$N_CONC" =~ ^[0-9]+$ && "$N_CONC" -ge 1 ]] || die "invalid -n: $N_CONC"
 [[ -f "$MAIN/result.json" ]] || die "main job not found: $MAIN"
 
@@ -101,6 +107,49 @@ for s in WALL:
     if f is not None and f < 0.5: continue   # still zero progress
     sel.append(s)
 print('\n'.join(sel))
+PYEOF
+  )
+elif [[ "$GROUP" == "failed23" ]]; then
+  # static residual set from reports/final-report-2026-10-26.md (23 tasks unsolved
+  # by gufo). Per-model solved-guard: drop tasks THIS model already scored
+  # reward=1 on, so the group is model-agnostic (MODEL=... selects the column).
+  mapfile -t TASKS < <(python3 - "$MODEL_SLUG" "$REPO/jobs" <<'PYEOF'
+import json, glob, os, sys
+model_slug, jobs_dir = sys.argv[1], sys.argv[2]
+FAILED23 = [
+    'awilix-async-container-initialization',
+    'bandit-structured-nosec-directives',
+    'csstree-shorthand-expansion-compression',
+    'effect-sse-httpapi-streaming',
+    'fastapi-deprecation-response-headers',
+    'fastapi-implicit-head-options',
+    'gql-incremental-graphql-delivery',
+    'httpx-multipart-response-parsing',
+    'httpx-streaming-json-iteration',
+    'ink-grid-box-layout',
+    'koota-deferred-mutation-buffer',
+    'kea-atomic-signal-selectors',
+    'koota-pair-relation-tracking',
+    'mashumaro-flattened-dataclass-fields',
+    'meriyah-explicit-resource-declarations',
+    'obsidian-linter-link-format-conversion',
+    'pest-character-class-coalescing',
+    'pebble-durability-wait-apis',
+    'prometheus-transactional-reload-status',
+    'termenv-preserve-ansi-resets',
+    'updo-policy-alerting',
+    'kombu-virtual-queue-dead-lettering',
+    'wasmi-trap-coredumps',
+]
+solved = set()
+for rw in glob.glob(os.path.join(jobs_dir, f'deepswe-{model_slug}*/', '*/verifier/reward.json')):
+    if '/.infra-failed-backup/' in rw: continue
+    try:
+        if json.load(open(rw)).get('reward') == 1:
+            cfg = os.path.dirname(os.path.dirname(rw)) + '/config.json'
+            solved.add(os.path.basename(json.load(open(cfg))['task']['path'].rstrip('/')))
+    except Exception: pass
+print('\n'.join(s for s in FAILED23 if s not in solved))
 PYEOF
   )
 elif [[ "$GROUP" == "failed13" ]]; then

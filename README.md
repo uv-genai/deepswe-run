@@ -372,7 +372,8 @@ Upstream task/verifier issues belong to
 scripts/                    all runnable scripts (invoke from the repo root):
   run_deepswe.sh              benchmark launcher (preflight + warm-up + pier run)
   scoreboard.sh               live results viewer for a running job
-  rerun-subset.sh             engine for subset batches (zeros/nearmiss/failed13/wallvictims)
+  rerun-subset.sh             engine for subset batches (zeros/nearmiss/failed13/wallvictims/failed23;
+                              MODEL=<id> targets another model, e.g. the maya campaign)
   rerun-zeros.sh              thin wrappers -> rerun-subset.sh
   rerun-nearmiss.sh             "
   rerun-failed13.sh             "  (forces --incremental)
