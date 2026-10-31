@@ -110,6 +110,10 @@ This is the same failure class documented in `zeros-rerun-analysis-2026-10-21.md
 
 ### 3.4 `wasmi-trap-coredumps`: rabbit-hole case (wall-victims attempt)
 
+> **Addendum (2026-10-31): solved — see the addendum after §6.** The same task was
+> completed 22/22 (p2p clean) by `maya-glm5-m-tp2-mtp` in one attempt, proving the
+> task solvable and pinning gufo's five zeros squarely on the model.
+
 The failed13 attempt reached **20/22** with an 85 KB patch. The wall-victims attempt (after the context fix) **never engaged with the task**: the word "coredump" appears only in the prompt across 12,520 log lines / 209 commands; the agent spent ~35 min on read-only exploration, then hit a *pre-existing* `E0554` (`#![feature] may not be used on the stable channel`) in `cargo test --all-features`, declared it the "issue", patched two `Cargo.toml` feature lines (878-byte patch), and submitted a confident summary. Pure model failure — no infra, no context error, patch collected correctly.
 
 ### 3.5 `kombu-virtual-queue-dead-lettering`: the only genuine never-started
@@ -171,6 +175,31 @@ The public leaderboard (updated 2026-09-22) reports **Pass@1** per model — one
 | Fresh one-shot on the fixed platform, stock config, `n=1` | **not yet run** | this is the leaderboard-grade number; the 66 baseline suggests it lands well above 58.9% |
 
 Caveats either way: their ± is a binomial CI over 113 tasks (79.6% vs 74% ≈ 1.5 CI widths), their “Best” toggle already selects each model's best effort tier, and our 79.6% has no CI (single campaign). A leaderboard submission would need their “Run DeepSWE” protocol — one attempt, stock config — which our main run approximates *except* it ran on the broken platform.
+
+---
+
+## Addendum (2026-10-31) — `wasmi-trap-coredumps` independently solved by a second model
+
+One day after this report, the one task gufo never solved (§3.4, five attempts,
+best 20/22) was **solved outright on its first attempt** by **`maya-glm5-m-tp2-mtp`**
+(GLM-5-M, TP2 + MTP, served by the same gufo platform):
+
+| | maya-glm5-m-tp2-mtp | gufo best (failed13) |
+|---|---|---|
+| Result | **reward 1 · f2p 22/22 · p2p 58/58 · partial 1.000** | 0 · 20/22 · 58/58 |
+| Config | commit-mandate agent config; backend `--context` raised | commit-mandate config |
+| Effort | 81 min, 195 steps, 72.9 KB patch | comparable |
+
+The patch is a full implementation (`coredump.rs` ×2, `code_map.rs` gaining IP →
+function/locals resolution, executor hooks in both dispatch backends, host
+re-entrancy extending frames across levels — the spec's hardest requirement).
+
+Three conclusions: (1) the task is **solvable**, so gufo's zeros were model-side,
+not task or harness artifacts; (2) the larger backend context was load-bearing
+(gufo's first two deaths were the old ceiling, and an earlier attempt of the
+second model died at a 32,768-token cap at step 14); (3) the `action was not
+executed` submit quirk appeared again and was again cosmetic — the patch
+collected cleanly.
 
 ---
 
