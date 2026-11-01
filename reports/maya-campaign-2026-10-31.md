@@ -41,19 +41,40 @@ Reference column = **gufo best attempt** across its 5–6 batches (Appendix A of
 | `termenv-preserve-ansi-resets` | 34/35 · 87/87 | | | | | | |
 | `updo-policy-alerting` | 15/17 · 123/123 | | | | | | |
 | `kombu-virtual-queue-dead-lettering` | 1/76 · 1412/1412 | | | | | | |
-| `wasmi-trap-coredumps` | 20/22 · 58/58 | | | **22/22 · 58/58 ✅ reward 1** (attempt 1; see below) | | | |
+| `wasmi-trap-coredumps` | 20/22 · 58/58 | | **22/22 ✅** | | **22/22 ✅** | | **22/22 ✅** |
 
-## Datapoint 1 — `wasmi-trap-coredumps` SOLVED by maya-glm5-m-tp2-mtp (2026-10-31)
+## Datapoint 1 — `wasmi-trap-coredumps` SOLVED by all three sizes (2026-10-31)
 
-The one task gufo never solved in five attempts (best 20/22) was completed **22/22,
-p2p 58/58, partial 1.000 on the first attempt**: 81 min, 195 steps, 72.9 KB patch
-(implementation spans `coredump.rs` ×2, `code_map.rs` IP→function/locals resolution,
-executor hooks in both dispatch backends, host re-entrancy frame extension).
-An earlier attempt of the same model died at a 32,768-token backend cap (step 14) —
-the raised `--context` is load-bearing. Cross-ref: final report addendum (2026-10-31).
+The one task gufo never solved in five attempts (best 20/22) was completed
+**22/22 f2p, 58/58 p2p, partial 1.000 on the first attempt by every size** —
+`maya-glm5-{s,m,l}-tp2-mtp`, commit-mandate config, raised backend context:
 
-Implications for the campaign: the residual task set is solvable in principle; gufo's
-zeros were model-side. Watch specifically for:
+| | maya-**s**-mtp | maya-**m**-mtp | maya-**l**-mtp | gufo (reference) |
+|---|---|---|---|---|
+| Result | **reward 1** | **reward 1** | **reward 1** | 0 · best 20/22 |
+| Duration | 163 min | 81 min | 100 min | — |
+| Steps | 308 | 195 | 227 | 195–209 (gufo attempts) |
+| Input tokens | **73.5 M** | 24.7 M | 28.7 M | 24.3 M (single attempt) |
+| Output tokens | **185.9 k** | 92.8 k | 94.4 k | 93.6 k |
+| Cache hit | 99.5% | 99.2% | 99.3% | 99.3% |
+| Patch | 98 KB | 71 KB | 68 KB | 85 KB (failed13) |
+| f2p / p2p fails | 0 / 0 | 0 / 0 | 0 / 0 | 2 / 0 (failed13) |
+
+**Token efficiency — the notable finding.** The S model is markedly less
+sample-efficient than M/L on this task: **2.0× the output tokens** of M (185.9 k vs
+92.8 k — not +50%) and **3.0× the input tokens** (73.5 M vs 24.7 M), for 1.6× the
+steps and 2.0× the wall time. L, by contrast, tracks M almost exactly (+1.7%
+output, +16% input/steps, +23% time) — the bigger model costs essentially nothing
+extra per solve here. All three left p2p untouched (no chronic-regressor behaviour
+on this task), and the patch sizes converge on the same implementation shape.
+
+Cross-ref: final report addendum (2026-10-31) for the implementation anatomy.
+Note: an earlier M attempt died at a 32,768-token backend cap (step 14) — the
+raised `--context` is load-bearing for all of these runs.
+
+Implications for the campaign: the residual task set is solvable in principle —
+now by **three different models on the first try**, so gufo's five zeros were
+model-side. Watch specifically for:
 - **chronic p2p regressors** (`gql`, `bandit`, `pest`) — did another model also break the
   same test, or is that a gufo-specific failure?
 - **the 3 wiped near-misses** (`meriyah`, `koota-pair`, `updo`) — gufo's best attempts
@@ -66,4 +87,5 @@ zeros were model-side. Watch specifically for:
 
 | Date | Event |
 |---|---|
-| 2026-10-31 | campaign started; `maya-glm5-m-tp2-mtp` first single-task run (wasmi) solved |
+| 2026-10-31 | campaign started; `maya-glm5-m-tp2-mtp` first single-task run (wasmi) solved 22/22 |
+| 2026-10-31 | wasmi also solved by `maya-glm5-s-tp2-mtp` and `maya-glm5-l-tp2-mtp` — all three sizes pass 22/22; S used 2× output / 3× input tokens of M |
