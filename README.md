@@ -183,6 +183,18 @@ If a future pier release restructures that install command, the reapply script
 detects it and prints the candidate lines instead of guessing — apply the
 `--with "litellm==1.105.1"` addition manually in that case.
 
+**Squid read timeout (same upgrade discipline).** pier also generates each
+trial's egress-proxy squid config from a template in `agent_setup.py`, with no
+`read_timeout` (squid default: 15 min). Every request on the agent path is
+non-streaming, so time-to-first-byte = full prefill + thinking + generation —
+long-thinking models get killed with `ERR_READ_TIMEOUT` (observed: maya-glm5-l,
+24 kills in one run). `./scripts/reapply-squid-timeout.sh [seconds]` (default
+3600) patches the template; it is idempotent, parses-checked, and must be
+re-run after pier upgrades alongside the litellm pin. The value must stay
+**above** litellm's router `timeout` (litellm answers with an error body at its
+deadline, which satisfies squid's read timer). Applies to trial containers
+started from now on — nothing to restart.
+
 ---
 
 ## 4. Running benchmarks
@@ -348,6 +360,7 @@ done
 |---|---|---|
 | Agent log fills with `litellm.APIConnectionError ... No module named 'mcp'`, trials finish in ~5 min with reward 0 / f2p 0 | unpinned litellm resolved to a broken release at image build (e.g. 1.106.0) — **not** a model failure | `./scripts/reapply-litellm-pin.sh` (§3.5), then re-run the affected trials with `./scripts/rerun-failed-trials.sh` |
 | After `uv tool upgrade datacurve-pier`, new trials fail with the mcp error | upgrade wiped the litellm pin | `./scripts/reapply-litellm-pin.sh` (§3.5) |
+| Trials die with squid `ERR_READ_TIMEOUT` while the model is thinking/generating | non-streaming path vs squid's 15-min default read timeout (or litellm `timeout` below the response time) | `./scripts/reapply-squid-timeout.sh` (§3.5), raise litellm `timeout` below it, consider a server-side thinking-budget cap |
 | Trials die mid-run; dockerd logs `no space left on device` | disk full — images + build cache accumulate ~1.7 GB/task | reclaim (§4 "Disk space"), resume the job |
 | `pier job resume` crashes: `ValidationError ... EOF while parsing a value` | disk-full crash left 0-byte `result.json` files | `rm` the empty `*/result.json` files, then resume (trials re-run) |
 | All trials error `NonZeroAgentExitCodeError`; agent log ends in `litellm.InternalServerError ... [Errno 111] Connection refused` | proxy's backend name resolves to a dead address (mDNS flake) — `/v1/models` still 200s, so preflight passes | pin `system76.local` (§3.3), re-run |
@@ -381,6 +394,7 @@ scripts/                    all runnable scripts (invoke from the repo root):
   rerun-failed-trials.sh      quarantine mcp-poisoned trials + resume the job
   start-rerun.sh              detached launcher -> rerun-failed-trials.sh
   reapply-litellm-pin.sh      re-pin litellm after a pier upgrade (§3.5)
+  reapply-squid-timeout.sh    restore pier's squid read_timeout patch (§3.5)
   free-space.sh               reclaim per-trial docker images + build cache
   resume.sh                   one-off: resume the interrupted gufo job
   run-deepswe-miny.py         helper: generate deepswe-mini test cases
