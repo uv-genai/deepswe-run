@@ -3,6 +3,7 @@
 > **This file is live.** It is updated whenever results, config, or pending work
 > change — treat it as the single source of truth for starting a session from
 > scratch. Dated `HANDOFF-*.md` files are frozen snapshots of past states.
+> To hand the session to a fresh agent, paste `HANDOFF-PROMPT.md`.
 > **Last updated: 2026-11-03.**
 
 ## 0. TL;DR for a fresh session

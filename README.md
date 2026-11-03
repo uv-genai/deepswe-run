@@ -408,6 +408,7 @@ jobs/                    per-job results (pier output); .infra-failed-backup/
                          inside a job holds quarantined infra-failed trials
 reports/                 analysis + final report (results of record)
 HANDOFF.md                   **live** session-handoff: state, config, rules, pending
+HANDOFF-PROMPT.md            copy-paste prompt for a fresh agent to resume the session
 HANDOFF-<date>.md            frozen snapshots of past handoff states (history)
 ```
 
