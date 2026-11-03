@@ -1,12 +1,6 @@
 # Session-restart prompt
 
-> Copy everything below the line into a fresh coding agent to resume this project.
-> It deliberately defers all state to `HANDOFF.md` so the two can never disagree:
-> update `HANDOFF.md`, not this file, when things change.
-
----
-
-You are resuming work on the DeepSWE benchmark project.
+You are resuming work on the DeepSWE benchmark project. Follow these instructions.
 
 **Start:** `cd /home/ugo/projects/deepswe-test` — everything below is relative to it.
 
