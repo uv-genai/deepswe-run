@@ -407,7 +407,8 @@ commit-incremental.yaml  agent config with commit-mandate (used via --incrementa
 jobs/                    per-job results (pier output); .infra-failed-backup/
                          inside a job holds quarantined infra-failed trials
 reports/                 analysis + final report (results of record)
-HANDOFF-*.md             session-restart handoff (dated snapshot)
+HANDOFF.md                   **live** session-handoff: state, config, rules, pending
+HANDOFF-<date>.md            frozen snapshots of past handoff states (history)
 ```
 
 > Layout note (2026-10-26): scripts were moved from the repo root into
