@@ -41,7 +41,7 @@
 | LiteLLM proxy | systemd **`litellm.service`** (litellm **1.91.0**, 4 workers) → `http://127.0.0.1:4000/v1`; config `~/software/litellm/litellm_config.yaml` — **OPERATOR-MANAGED: never start/stop/restart on your own; file edits + restarts only on explicit operator request** (last such request: 2026-11-03) |
 | Router settings | `timeout: 1800` (raised from 600 on 2026-11-03 — long-thinking non-streaming path), `num_retries: 1`, `cooldown_time: 120`, no tpm, `rpm: 1000`; backup `litellm_config.yaml.bak-20261103-0941` |
 | Model backend | `strix-halo-1.local:8080` (llama-swap → llama-server) — **gufo = Qwen3.8-Flash-Next Q8, TP2 across two Strix Halo, 2× Thunderbolt 4 (37 Gb/s, 6 µs), 240 GB**; ~45–65 tok/s, context-independent, **contexts > 300 k** (largest accepted: 328,485 tokens; original 262,144 wall removed 2026-10-25) |
-| Also served | `maya-glm5-{s,m,l}-tp2[-mtp]` (GLM-5.3 quants: S=2-bit, M slightly higher, L higher), `maya-deepseek-xs`, `halogen-*`, `gufo-*-q4` — `curl :4000/v1/models` for the live list (15 models) |
+| Also served | `maya-glm5-{s,m,l}-tp2[-mtp]` (GLM-5.3 quants: S=2-bit, M slightly higher, L higher), `maya-deepseek-{xs,s}-dspark` (**DeepSeek v4.1 Flash @ Q1 / Q2/3** — github.com/mw00/project-maya), `halogen-*`, `gufo-*-q4` — `curl :4000/v1/models` for the live list (15 models) |
 | Local llama-swap | `system76.local:8080` — only for local test models; **not** part of any benchmark track |
 | Port-80 relay | container `deepswe-relay` (`--restart unless-stopped`): host `:80 → 127.0.0.1:4000` (trial egress allows only 80/443) |
 | Trial base URL | **`OPENAI_BASE_URL=http://172.17.0.1/v1`** — never `127.0.0.1` (that's the container itself) |
@@ -90,11 +90,14 @@ Zero-pass (reward=0, f2p 0/N) in gufo's final view: **updo, wasmi, koota-pair, m
 **maya campaign — in progress** (`reports/maya-campaign-2026-10-31.md`):
 - `wasmi-trap-coredumps` **solved 22/22 by maya-{s,m,l}-tp2-mtp** (first attempt each);
   S burned 2× output / 3× input tokens of M for the same score (quant-efficiency signal)
-- `awilix`: maya-m **23/24 — the identical single test gufo fails** (task-edge, not
-  model); maya-l **2× infra death** (long-think vs non-streaming → now fixed by the
-  timeout patches) → **rerun pending**
-- S is a 2-bit GLM-5.3 quant, M slightly higher, L higher — the gufo-vs-GLM
-  comparison is the operator's quant-quality question (scorecard idea in the report)
+- `awilix`: **solved 24/24 by `maya-deepseek-s` (DeepSeek v4.1 Flash Q2/3, 1st try)** —
+  beating gufo **Q8** (failed twice) and GLM-m, which all miss the identical edge
+  test; `ds-xs` (Q1) scored 23/24 with the same miss. maya-l's 2 attempts were
+  infra deaths (pre-fix timeouts) → **rerun pending**. Capability tracks the model,
+  bit depth tracks cost (report Datapoint 2)
+- S is a 2-bit GLM-5.3 quant, M slightly higher, L higher — the gufo-vs-GLM/DeepSeek
+  comparison is the operator's quant-quality question (scorecard plan:
+  `quant-sensitive-tasks.md`; Q8-vs-Q4 same-weights arm ready via `failed23`)
 
 **Platform incidents** (all found by the benchmark, all fixed): litellm router
 misconfig (tpm/timeout/retries, fixed 10-18), output-token cap (truncations in

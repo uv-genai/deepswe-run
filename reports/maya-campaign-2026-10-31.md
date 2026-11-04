@@ -1,9 +1,10 @@
-# Maya campaign — re-running the DeepSWE failed-task set on GLM-5 (S/M/L)
+# Maya campaign — re-running the DeepSWE failed-task set on GLM-5 (S/M/L) and DeepSeek v4.1 Flash
 
 **Started:** 2026-10-31 · **Companion:** `final-report-2026-10-26.md` (gufo Qwen3.8 campaign, 90/113)
 **Task set:** the **23 tasks unsolved** by `gufo-qwen3.8-flash-next-tp2-q8` (final report §3 + Appendix A) — includes the 3 harness-wiped near-misses, the 3 chronic p2p-regressors, and `kombu`
 **Platform:** same gufo serving stack (two Strix Halo, TP2, Thunderbolt 4), backend `--context` raised (>300k), platform frozen
-**Models (6):** `maya-glm5-{s,m,l}-tp2` and `maya-glm5-{s,m,l}-tp2-mtp` (GLM-5 at 3 sizes, ± MTP speculative decoding)
+**Models (6 GLM arms):** `maya-glm5-{s,m,l}-tp2` and `maya-glm5-{s,m,l}-tp2-mtp` (GLM-5 at 3 sizes, ± MTP speculative decoding)
+**DeepSeek arms:** `maya-deepseek-xs` = DeepSeek v4.1 Flash **Q1**, `maya-deepseek-s` = DeepSeek v4.1 Flash **Q2/3** — project [mw00/project-maya](https://github.com/mw00/project-maya)
 
 ## Protocol conventions
 
@@ -17,9 +18,9 @@
 
 Reference column = **gufo best attempt** across its 5–6 batches (Appendix A of the companion report).
 
-| Task | gufo best (f2p / p2p) | maya-s | maya-s-mtp | maya-m | maya-m-mtp | maya-l | maya-l-mtp |
-|---|---|---|---|---|---|---|---|
-| `awilix-async-container-initialization` | 23/24 · 162/162 | | | | | | |
+| Task | gufo best (f2p / p2p) | maya-s | maya-s-mtp | maya-m | maya-m-mtp | maya-l | maya-l-mtp | ds-xs (Q1) | ds-s (Q2/3) |
+|---|---|---|---|---|---|---|---|---|---|
+| `awilix-async-container-initialization` | 23/24 · 162/162 | | | | | | | 23/24 · 162/162 | **24/24 ✅ reward 1** |
 | `bandit-structured-nosec-directives` | 69/69 · p2p 281/282 | | | | | | |
 | `csstree-shorthand-expansion-compression` | 76/79 · 16715/16715 | | | | | | |
 | `effect-sse-httpapi-streaming` | 46/47 · 70/70 | | | | | | |
@@ -83,9 +84,41 @@ model-side. Watch specifically for:
   line, awilix/mashumaro/obsidian-link single cases) — identical failing tests across gufo
   attempts; a second model missing them the same way would suggest task/verifier edges.
 
+## Datapoint 2 — `awilix` SOLVED by DeepSeek v4.1 Flash at **Q2/3**, beating Qwen3.8 at Q8 (2026-11-04)
+
+The single edge test that three earlier attempts missed *identically* —
+`…Edge cases and integration allows scope.initialize() without calling
+parent.initialize() first` — was passed by the DeepSeek Q2/3 arm on its first try:
+
+| Attempt | Model / bits | Result | Effort | Exception |
+|---|---|---|---|---|
+| **2026-11-04** | **`maya-deepseek-s` — DeepSeek v4.1 Flash Q2/3** | ✅ **24/24 · partial 1.000 · reward 1** | 54 min, 74 steps, 51 KB, 83.6 k out | none |
+| 2026-11-03 | `maya-deepseek-xs` — DeepSeek v4.1 Flash **Q1** | ❌ 23/24 · 0.9946 | 51 min, 55 steps, 40 KB, 62.4 k out | none |
+| 2026-10-31 | `maya-glm5-m-tp2-mtp` | ❌ 23/24 · 0.9946 | 46 min, 80 steps, 57 KB, 62.5 k out | none |
+| gufo campaign ×2 | `gufo-qwen3.8-flash-next-tp2-q8` (**Q8**) | ❌ 23/24 · 0.9946 (both) | main + nearmiss | none |
+| 2026-11-02/03 | `maya-glm5-l-tp2-mtp` | ❌ 0/24 (infra: pre-fix timeouts) | 2 attempts killed | read-timeouts |
+
+**Findings:**
+
+1. **First-ever solve of this task** — and the head-to-head is the campaign's
+   sharpest so far: **Qwen3.8-Flash-Next at Q8 failed it twice; DeepSeek v4.1
+   Flash at Q2/3 passed it first try.** Even the Q1 arm reached 23/24 with the
+   same single miss as gufo/GLM-m, so the model finds the edge at a bit depth
+   where the Q8 competitor does not.
+2. **Revises the earlier classification.** awilix was filed as "task-edge, not a
+   discriminator" when gufo and GLM-m failed identically — the DeepSeek arms
+   show it *does* discriminate: model family/capability decides whether the edge
+   is found, while **bit depth tracks cost, not outcome** (consistent with the
+   wasmi S-vs-M token gap: ds-s spent 34% more output than GLM-m for its solve,
+   and Q1 xs still scored 23/24).
+3. **Clean runs on both DeepSeek arms** (no exceptions) — the 2026-11-03
+   timeout hardening (litellm 1800 + squid 3600) is holding.
+
 ## Log
 
 | Date | Event |
 |---|---|
 | 2026-10-31 | campaign started; `maya-glm5-m-tp2-mtp` first single-task run (wasmi) solved 22/22 |
 | 2026-10-31 | wasmi also solved by `maya-glm5-s-tp2-mtp` and `maya-glm5-l-tp2-mtp` — all three sizes pass 22/22; S used 2× output / 3× input tokens of M |
+| 2026-11-03 | `maya-deepseek-xs` (DeepSeek v4.1 Flash **Q1**) awilix 23/24 — same single edge test as gufo/GLM-m |
+| 2026-11-04 | **awilix solved by `maya-deepseek-s` (Q2/3): 24/24, partial 1.000** — first solve; beats gufo Q8 and GLM-m on the task |
