@@ -91,10 +91,10 @@ Zero-pass (reward=0, f2p 0/N) in gufo's final view: **updo, wasmi, koota-pair, m
 - `wasmi-trap-coredumps` **solved 22/22 by maya-{s,m,l}-tp2-mtp** (first attempt each);
   S burned 2× output / 3× input tokens of M for the same score (quant-efficiency signal)
 - `awilix`: **solved 24/24 by `maya-deepseek-s` (DeepSeek v4.1 Flash Q2/3, 1st try)** —
-  beating gufo **Q8** (failed twice) and GLM-m, which all miss the identical edge
-  test; `ds-xs` (Q1) scored 23/24 with the same miss. maya-l's 2 attempts were
-  infra deaths (pre-fix timeouts) → **rerun pending**. Capability tracks the model,
-  bit depth tracks cost (report Datapoint 2)
+  beating gufo **Q8** (failed twice) and GLM-m/L/Q1, which all miss the identical
+  edge test at 23/24. GLM-L's rerun after the timeout fix is clean (23/24, no
+  exceptions) — its earlier zeros were one **792 s** request vs the old 600 s
+  litellm timeout. Capability tracks the model, bit depth tracks cost (Datapoint 2)
 - S is a 2-bit GLM-5.3 quant, M slightly higher, L higher — the gufo-vs-GLM/DeepSeek
   comparison is the operator's quant-quality question (scorecard plan:
   `quant-sensitive-tasks.md`; Q8-vs-Q4 same-weights arm ready via `failed23`)

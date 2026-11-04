@@ -20,7 +20,7 @@ Reference column = **gufo best attempt** across its 5–6 batches (Appendix A of
 
 | Task | gufo best (f2p / p2p) | maya-s | maya-s-mtp | maya-m | maya-m-mtp | maya-l | maya-l-mtp | ds-xs (Q1) | ds-s (Q2/3) |
 |---|---|---|---|---|---|---|---|---|---|
-| `awilix-async-container-initialization` | 23/24 · 162/162 | | | | | | | 23/24 · 162/162 | **24/24 ✅ reward 1** |
+| `awilix-async-container-initialization` | 23/24 · 162/162 | | | | | | **23/24 · 162/162** | 23/24 · 162/162 | **24/24 ✅ reward 1** |
 | `bandit-structured-nosec-directives` | 69/69 · p2p 281/282 | | | | | | |
 | `csstree-shorthand-expansion-compression` | 76/79 · 16715/16715 | | | | | | |
 | `effect-sse-httpapi-streaming` | 46/47 · 70/70 | | | | | | |
@@ -96,7 +96,8 @@ parent.initialize() first` — was passed by the DeepSeek Q2/3 arm on its first 
 | 2026-11-03 | `maya-deepseek-xs` — DeepSeek v4.1 Flash **Q1** | ❌ 23/24 · 0.9946 | 51 min, 55 steps, 40 KB, 62.4 k out | none |
 | 2026-10-31 | `maya-glm5-m-tp2-mtp` | ❌ 23/24 · 0.9946 | 46 min, 80 steps, 57 KB, 62.5 k out | none |
 | gufo campaign ×2 | `gufo-qwen3.8-flash-next-tp2-q8` (**Q8**) | ❌ 23/24 · 0.9946 (both) | main + nearmiss | none |
-| 2026-11-02/03 | `maya-glm5-l-tp2-mtp` | ❌ 0/24 (infra: pre-fix timeouts) | 2 attempts killed | read-timeouts |
+| 2026-11-02/03 | `maya-glm5-l-tp2-mtp` | ❌ 0/24 (infra: pre-fix timeouts) | 2 attempts killed by a single **792 s** request vs the old `timeout: 600` | read-timeouts |
+| 2026-11-04 | `maya-glm5-l-tp2-mtp` **rerun, post-fix** | ❌ **23/24 · 0.9946** (same edge test) | 61 min, 74 steps, 77.7 k out | **none** — the 792 s-class request completed under the new 1800 s timeout |
 
 **Findings:**
 
@@ -111,8 +112,10 @@ parent.initialize() first` — was passed by the DeepSeek Q2/3 arm on its first 
    is found, while **bit depth tracks cost, not outcome** (consistent with the
    wasmi S-vs-M token gap: ds-s spent 34% more output than GLM-m for its solve,
    and Q1 xs still scored 23/24).
-3. **Clean runs on both DeepSeek arms** (no exceptions) — the 2026-11-03
-   timeout hardening (litellm 1800 + squid 3600) is holding.
+3. **Clean runs on every arm since the 2026-11-03 hardening** (both DeepSeek arms,
+   and the GLM-L rerun whose earlier deaths were traced to a single **792-second**
+   request against the old 600 s timeout — with litellm at 1800 s it completes and
+   the task scores normally). The timeout class is fixed end to end.
 
 ## Log
 
@@ -122,3 +125,4 @@ parent.initialize() first` — was passed by the DeepSeek Q2/3 arm on its first 
 | 2026-10-31 | wasmi also solved by `maya-glm5-s-tp2-mtp` and `maya-glm5-l-tp2-mtp` — all three sizes pass 22/22; S used 2× output / 3× input tokens of M |
 | 2026-11-03 | `maya-deepseek-xs` (DeepSeek v4.1 Flash **Q1**) awilix 23/24 — same single edge test as gufo/GLM-m |
 | 2026-11-04 | **awilix solved by `maya-deepseek-s` (Q2/3): 24/24, partial 1.000** — first solve; beats gufo Q8 and GLM-m on the task |
+| 2026-11-04 | GLM-5.3 `maya-glm5-l-tp2-mtp` awilix rerun clean (no timeouts): 23/24, same edge test — prior zeros were the 792 s request vs the old 600 s litellm timeout |
