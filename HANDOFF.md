@@ -155,6 +155,7 @@ read timeout vs long thinking (fixed 11-03), plus a historic squid timeout on
 | `commit-incremental.yaml` | agent config with commit-mandate (use via `--incremental`/`-c`) |
 | `reports/final-report-2026-10-26.md` | **gufo results of record** (+ addendum: wasmi solved by maya) |
 | `reports/maya-campaign-2026-10-31.md` | maya campaign matrix + datapoints |
+| `reports/model-comparison-2026-11-04.md` | cross-model profiles: strengths/weaknesses, quantization vs size, which model for which task |
 | `reports/*` | earlier analysis (zeros-rerun, nearmiss-rerun, zero-pass, per-task) |
 | `log/` | all run logs (gitignored); `jobs/` | per-trial results (gitignored) |
 | `README.md` | full setup docs (§3 host, §3.5 pier patches, §4 runs, §6 troubleshooting) |
