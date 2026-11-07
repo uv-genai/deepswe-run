@@ -134,10 +134,13 @@ read timeout vs long thinking (fixed 11-03), plus a historic squid timeout on
    ```bash
    MODEL=maya-glm5-m-tp2-mtp  ./scripts/rerun-subset.sh failed23 --incremental -n 2
    ```
-   arms: `maya-glm5-{s,m,l}-tp2`, `maya-glm5-{s,m,l}-tp2-mtp`, optionally
-   `gufo-qwen3.8-flash-next-tp2-q4` (same-weights quant A/B) and gufo post-upgrade retest.
+   arms: `maya-glm5-{s,m,l}-tp2`, `maya-glm5-{s,m,l}-tp2-mtp`; gufo post-upgrade
+   retest is partial (wasmi attempt 7 solved → 91/113; awilix still open for gufo).
    ~17–18 h/arm at `-n 2`, ~40 GB; `free-space.sh` between arms.
-3. **maya-l awilix rerun** (both prior attempts were infra deaths; timeout fixes in place).
+3. **Done:** maya-l awilix rerun (11-04: 23/24, clean) and the **gufo Q8-vs-Q4
+   same-weights A/B** (11-07: identical outcomes — wasmi ✅ 22/22 both, awilix
+   23/24 same test both; Q4 pays +20–40 % tokens for ~20 % faster decode) — see
+   `model-comparison-2026-11-04.md` §1.1/§3.
 4. **Operator:** reduce thinking budget server-side (their step, after the timeout work).
 5. Optional: streaming end-to-end (mini-swe 2.4.6 has **no** LLM streaming — verified
    from the wheel; `model_kwargs: {stream: true}` would break `LitellmResponseModel`,

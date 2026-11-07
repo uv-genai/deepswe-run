@@ -127,3 +127,4 @@ parent.initialize() first` — was passed by the DeepSeek Q2/3 arm on its first 
 | 2026-11-04 | **awilix solved by `maya-deepseek-s` (Q2/3): 24/24, partial 1.000** — first solve; beats gufo Q8 and GLM-m on the task |
 | 2026-11-04 | GLM-5.3 `maya-glm5-l-tp2-mtp` awilix rerun clean (no timeouts): 23/24, same edge test — prior zeros were the 792 s request vs the old 600 s litellm timeout |
 | 2026-11-07 | **gufo itself solved wasmi on attempt 7** (22/22, clean) → corpus 91/113; the task is no longer a gufo residual |
+| 2026-11-07 | **gufo Q4 same-weights A/B:** wasmi ✅ 22/22 (69 min, 250 steps), awilix 23/24 same edge test — outcomes identical to Q8, cost +20–40 % tokens at ~20 % faster decode (`model-comparison-2026-11-04.md` §1.1/§3) |
