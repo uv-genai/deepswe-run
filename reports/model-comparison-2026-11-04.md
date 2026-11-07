@@ -11,18 +11,18 @@ profiles below are hypotheses to be confirmed by the `failed23` batches, not ran
 
 ## 1. The evidence
 
-| | wasmi (gufo: 0 in 6 attempts) | awilix (gufo: 0 in 2 attempts) |
+| | wasmi (gufo: failed 6×, **solved on attempt 7**, 2026-11-07) | awilix (gufo: 0 in 2 attempts) |
 |---|---|---|
-| gufo Q8 | 20/22 best, never a green suite | 23/24 ×2 (identical edge test) |
+| gufo Q8 | ✅ **22/22** (post-upgrade; earlier: 3× wall, rabbit-hole, Sync-breaking 20/22) | 23/24 ×2 (identical edge test) |
 | **GLM-5.3 S / M / L** | ✅ **22/22 — all three** | S: not run · M: 23/24 · L: 23/24 |
 | **DeepSeek v4.1 Q2/3** | not run | ✅ **24/24 — only solve** |
 | DeepSeek v4.1 Q1 | not run | 23/24 (same edge test) |
 
-**No model has solved both of gufo's failures** — the two tasks were won by different
-families (GLM took wasmi, DeepSeek took awilix). Both are single-task, first-attempt
-results unless noted.
+**Nobody holds both tasks.** gufo recovered **wasmi** itself on attempt 7; **awilix**
+remains unsolved by gufo. Among the maya arms the tasks went to different families
+(GLM took wasmi, DeepSeek took awilix). All non-gufo results are first attempts.
 
-Full run detail (7 non-gufo runs, all clean post-2026-11-03):
+Full run detail (7 non-gufo runs + gufo's wasmi retest, all clean post-2026-11-03):
 
 | Arm | Task | reward | f2p | p2p | Effort |
 |---|---|---|---|---|---|
@@ -31,13 +31,14 @@ Full run detail (7 non-gufo runs, all clean post-2026-11-03):
 | glm5-m | awilix | 0 | 23/24 | 162/162 | 46 min, 80 steps, 62.5 k out |
 | glm5-l | awilix | 0 | 23/24 | 162/162 | 61 min, 74 steps, 77.7 k out |
 | glm5-s / m / l | wasmi | **1** | 22/22 | 58/58 | S: 163 min/186 k out · M: 81 min/93 k · L: 100 min/94 k |
-| gufo q8 (post-upgrade) | wasmi | 0 | 20/22 | **0/58** | 99 min, 292 steps — patch broke `Store: Sync` (E0277) |
+| gufo q8 (post-upgrade) | wasmi | 0 (attempt 6) | 20/22 | **0/58** | 99 min, 292 steps — patch broke `Store: Sync` (E0277) |
+| **gufo q8 (post-upgrade)** | **wasmi** | **1 (attempt 7)** | **22/22** | **58/58** | 67 min, 182 steps, 83 KB, 164 k out |
 
 ## 2. Per-model profiles
 
 | Model | Strength | Weakness | Evidence |
 |---|---|---|---|
-| **gufo Qwen3.8 Q8** | **Breadth** — the only corpus-proven model (90/113 = 79.6%); strong on long-horizon work across 5 languages; its residuals are almost all 1–2-test edges (17/23 at partial ≥ 0.95) | **Deterministic behavioral misses**: breaks existing tests (3 chronic p2p regressors — *same test every attempt*), misses precise edges (awilix, kea — *same test 4×*), rabbit-holes on huge specs (wasmi), submission fragility (fixed by commit-mandate), and most recently **broke the `Store: Sync` invariant** → p2p 0/58 despite 20/22 f2p | 113 tasks, 186 trials |
+| **gufo Qwen3.8 Q8** | **Breadth** — the only corpus-proven model (**91/113 = 80.5 %** after the 11-07 wasmi solve); strong on long-horizon work across 5 languages; its residuals are almost all 1–2-test edges (17/23 at partial ≥ 0.95) | **Deterministic behavioral misses**: breaks existing tests (3 chronic p2p regressors — *same test every attempt*), misses precise edges (awilix, kea — *same test 4×*), rabbit-holes on huge specs (wasmi — *recovered on attempt 7*), submission fragility (fixed by commit-mandate), and on attempt 6 **broke the `Store: Sync` invariant** → p2p 0/58 | 113 tasks, 187 trials |
 | **GLM-5.3 M** | **Complex feature implementation under strict invariants** — first-try 22/22 on the task gufo never solved; never broke p2p in any run; **best efficiency of the three sizes** (46–81 min, 62–93 k out) | misses the gufo-identical edge tests (awilix 23/24) | 2 tasks |
 | **GLM-5.3 L** | results identical to M (22/22, 23/24) at near-identical cost (+1.7 % output, +16 % steps, +23 % time) | **thinks much longer per response** (one 792 s request killed it under the old 600 s timeout) → latency pressure; **no accuracy premium over M observed** | 2 tasks |
 | **GLM-5.3 S (2-bit)** | solves everything M solves (wasmi 22/22) | **worst efficiency: 2× output, 3× input, 1.6× steps, 2× wall time** vs M for identical outcomes | 1 task |
@@ -72,8 +73,8 @@ Full run detail (7 non-gufo runs, all clean post-2026-11-03):
 
 ## 5. Evidence gaps → next runs
 
-- **DeepSeek on wasmi** — if it lands 22/22, it becomes the first model to solve *both*
-  of gufo's failures (the "most capable" claim would then have direct support)
+- **DeepSeek on wasmi** — if it lands 22/22, DeepSeek becomes the only *maya arm*
+  holding **both** tasks (gufo has wasmi now; awilix is the open one for everyone else)
 - **GLM-S on awilix** — completes the 2×2 and the quant ladder on the edge task
 - **`failed23` arms** (`MODEL=<id> ./scripts/rerun-subset.sh failed23 --incremental -n 2`)
   for GLM-M and DeepSeek-S — the only way these profiles become rankings; fill the

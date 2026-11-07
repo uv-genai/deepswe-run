@@ -29,6 +29,8 @@
 - **wallvictims (2):** `koota-composite-trait-aspects`, `sqlfmt-create-table-ddl-formatting`
 
 > **Baseline caveat:** the main-run 66 was measured while the serving platform was still partially misconfigured (LiteLLM router, output-token cap, concurrency — §2). Every stage after it re-runs the *same* tests on progressively fixed config; see §4 for attribution.
+>
+> **Update 2026-11-07:** gufo later solved `wasmi-trap-coredumps` (attempt 7, post-upgrade) → standing **91/113 (80.5%)**, residual 22 — see the Postscript after §6.
 
 ---
 
@@ -200,6 +202,27 @@ not task or harness artifacts; (2) the larger backend context was load-bearing
 second model died at a 32,768-token cap at step 14); (3) the `action was not
 executed` submit quirk appeared again and was again cosmetic — the patch
 collected cleanly.
+
+---
+
+## Postscript (2026-11-07) — gufo itself solves wasmi; corpus → 91/113 (80.5 %)
+
+On its **7th attempt**, after the platform upgrades (context, output tokens,
+litellm/squid timeouts) and with the commit-mandate config, `gufo-qwen3.8-flash-next-tp2-q8`
+solved `wasmi-trap-coredumps`:
+
+| | |
+|---|---|
+| Result | **reward 1 · f2p 22/22 · p2p 58/58 · partial 1.000** |
+| Effort | 67 min, 182 steps, 83 KB patch, 39.3 M in / 164 k out |
+| Patch | real implementation (`coredump.rs`, `code_map.rs`, executor hooks, `error.rs`) — this time **without** breaking `Store: Sync`, which killed attempt 6 with p2p 0/58 |
+| Infra | clean: 0 read-timeouts, no context errors, no exception |
+
+**Standing: 91/113 (80.5 %)** — the 90 above was the report cut; residual now **22**.
+gufo's wasmi history in full: 3× context wall → 1 rabbit-hole → 1 Sync-breaking
+20/22 → **1 solve**. The zero-pass set shrinks to **3** (`koota-pair`, `meriyah`,
+`updo` — all empty-patch harness casualties, §3.3). §6's leaderboard comparison is
+unaffected: this is a pass@2..7 result, not pass@1.
 
 ---
 

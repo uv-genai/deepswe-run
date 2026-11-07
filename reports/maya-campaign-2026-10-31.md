@@ -42,7 +42,7 @@ Reference column = **gufo best attempt** across its 5–6 batches (Appendix A of
 | `termenv-preserve-ansi-resets` | 34/35 · 87/87 | | | | | | |
 | `updo-policy-alerting` | 15/17 · 123/123 | | | | | | |
 | `kombu-virtual-queue-dead-lettering` | 1/76 · 1412/1412 | | | | | | |
-| `wasmi-trap-coredumps` | 20/22 · 58/58 | | **22/22 ✅** | | **22/22 ✅** | | **22/22 ✅** |
+| `wasmi-trap-coredumps` | **22/22 ✅** (attempt 7, 11-07) | | **22/22 ✅** | | **22/22 ✅** | | **22/22 ✅** |
 
 ## Datapoint 1 — `wasmi-trap-coredumps` SOLVED by all three sizes (2026-10-31)
 
@@ -126,3 +126,4 @@ parent.initialize() first` — was passed by the DeepSeek Q2/3 arm on its first 
 | 2026-11-03 | `maya-deepseek-xs` (DeepSeek v4.1 Flash **Q1**) awilix 23/24 — same single edge test as gufo/GLM-m |
 | 2026-11-04 | **awilix solved by `maya-deepseek-s` (Q2/3): 24/24, partial 1.000** — first solve; beats gufo Q8 and GLM-m on the task |
 | 2026-11-04 | GLM-5.3 `maya-glm5-l-tp2-mtp` awilix rerun clean (no timeouts): 23/24, same edge test — prior zeros were the 792 s request vs the old 600 s litellm timeout |
+| 2026-11-07 | **gufo itself solved wasmi on attempt 7** (22/22, clean) → corpus 91/113; the task is no longer a gufo residual |

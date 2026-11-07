@@ -9,8 +9,9 @@
 
 ## 0. TL;DR for a fresh session
 
-- **Standing:** gufo campaign **final: 90/113 (79.6%)** — results of record in
-  `reports/final-report-2026-10-26.md`, tagged `final-2026-10-26-90-113-v2`.
+- **Standing:** gufo campaign **91/113 (80.5%)** — 90 at the final-report cut
+  (`reports/final-report-2026-10-26.md`, tag `final-2026-10-26-90-113-v2`) + wasmi
+  solved on attempt 7, 2026-11-07 (postscript in that report). Residual **22**.
   No jobs running; git clean and pushed.
 - **In flight:** the **maya campaign** (GLM-5 S/M/L ±MTP on the 23 residual tasks)
   — `reports/maya-campaign-2026-10-31.md`; partial: wasmi solved by all three sizes.
@@ -76,16 +77,19 @@
 
 ## 4. Where things stand (results)
 
-**gufo campaign — final, 90/113 (79.6%)**: main 66 → +1 arktype 67 → +3 zeros 70
-→ +8 failed13 78 → +10 nearmiss 88 → +2 wallvictims 90. Full analysis:
+**gufo campaign — 91/113 (80.5%)**: main 66 → +1 arktype 67 → +3 zeros 70
+→ +8 failed13 78 → +10 nearmiss 88 → +2 wallvictims 90 → **+1 wasmi (attempt 7,
+post-upgrade, 2026-11-07) = 91**. Full analysis:
 `reports/final-report-2026-10-26.md` (§2 = three platform-fix phases, §3 = failure
 taxonomy of the 23 residuals, §4 = attribution, §6 = leaderboard comparison).
 
-**Residual 23** (the `failed23` group): 3 chronic p2p regressors (gql/bandit/pest —
+**Residual 22** (the `failed23` group; the guard now selects 22 for gufo too —
+wasmi dropped after its 11-07 solve): 3 chronic p2p regressors (gql/bandit/pest —
 deterministic, same test every attempt), ~17 one/few-f2p-test misses (half with
 identical failing tests across attempts), 3 harness-wiped near-misses (meriyah
 45/49→0/49, koota-pair 37/38→0/38, updo 15/17→0/17), kombu (deliberate empty diff).
-Zero-pass (reward=0, f2p 0/N) in gufo's final view: **updo, wasmi, koota-pair, meriyah**.
+Zero-pass (reward=0, f2p 0/N) in gufo's view: **koota-pair, meriyah, updo** (all
+empty-patch harness casualties; wasmi left this list on 2026-11-07).
 
 **maya campaign — in progress** (`reports/maya-campaign-2026-10-31.md`):
 - `wasmi-trap-coredumps` **solved 22/22 by maya-{s,m,l}-tp2-mtp** (first attempt each);
