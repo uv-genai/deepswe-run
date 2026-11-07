@@ -34,6 +34,42 @@ Full run detail (7 non-gufo runs + gufo's wasmi retest, all clean post-2026-11-0
 | gufo q8 (post-upgrade) | wasmi | 0 (attempt 6) | 20/22 | **0/58** | 99 min, 292 steps — patch broke `Store: Sync` (E0277) |
 | **gufo q8 (post-upgrade)** | **wasmi** | **1 (attempt 7)** | **22/22** | **58/58** | 67 min, 182 steps, 83 KB, 164 k out |
 
+### 1.1 Effort comparison — wasmi: four models, one identical score
+
+The cleanest cross-model efficiency evidence available: same task, same
+commit-mandate config, all four **22/22 with green p2p**.
+
+| Metric | gufo Q8 (att. 7) | GLM-5.3 M | GLM-5.3 L | GLM-5.3 S (2-bit) |
+|---|---|---|---|---|
+| Wall time | **67 min** 🥇 | 81 min | 100 min | **163 min** |
+| Steps | **182** | 195 | 227 | **308** |
+| sec/step | **22** 🥇 | 25 | 26 | 32 |
+| Input tokens | 39.3 M | **24.7 M** 🥇 | 28.7 M | 73.5 M |
+| in/step | 216 k | 127 k | 126 k | 239 k |
+| Output tokens | 164.4 k | **92.8 k** 🥇 | 94.4 k | 185.9 k |
+| out/step | 903 | 476 | 416 | 603 |
+| Cache hit | 99.5 % | 99.2 % | 99.3 % | 99.5 % |
+| Patch | 83 KB | 71 KB | 68 KB | 98 KB |
+
+1. **Speed ranking: gufo < M < L ≪ S.** gufo wins on *steps*, not tokens: its
+   responses are ~2× longer per step (903 vs M's 476) but it takes fewer, faster
+   steps and never stalls. Wall time = steps × sec/step, so S's 2.4× penalty comes
+   from **both** factors (308 steps × 32 s).
+2. **Context discipline differs sharply:** gufo re-sends a ~200 k-token working
+   context each step (216 k in/step) vs GLM's ~126 k — more history carried, but
+   the prefix cache absorbs it (99.5 % hit either way). **GLM-M is the most frugal
+   overall: 24.7 M input / 92.8 k output ≈ ⅓ of gufo's input and ½ its output** for
+   the identical result.
+3. **S repeats the awilix tax:** 3.0× M's input, 2.0× its output, 2.4× the wall
+   time for the same score — at 2-bit the cost is purely efficiency.
+4. **Patch sizes converge (68–98 KB)** — implementation size separates no one.
+5. **gufo's solve was not an outlier effort:** its wasmi band across all attempts
+   is 57–85 min / 147–214 steps; attempt 7 (67 min / 182 steps) is mid-band. The
+   earlier zeros were wall/behavior failures, not under-effort.
+6. **DeepSeek has not run wasmi** (no job exists) — the remaining datapoint: it
+   would be the only maya arm holding both tasks, and its efficiency profile on
+   this task is unknown.
+
 ## 2. Per-model profiles
 
 | Model | Strength | Weakness | Evidence |
