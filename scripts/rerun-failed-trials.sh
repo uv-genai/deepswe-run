@@ -3,8 +3,8 @@
 # breakage, re-queue all trials poisoned by "No module named 'mcp'" plus whatever
 # was still pending when the run was killed.
 #
-#   ./scripts/rerun-failed-trials.sh                       # default: the gufo job
-#   ./scripts/rerun-failed-trials.sh jobs/<other-job-dir>  # another job
+#   ./scripts/rerun-failed-trials.sh jobs/<job-dir>            # the job to resume
+#   ./scripts/rerun-failed-trials.sh jobs/<job-dir> -n 2       # with concurrency
 #
 # What it does:
 #   1. preflight: pier not running, litellm pin present in pier, relay up,
@@ -17,7 +17,7 @@
 #      base URL, then verifies it started cleanly
 set -euo pipefail
 
-#   ./scripts/rerun-failed-trials.sh [job-dir] [-n N]
+#   ./scripts/rerun-failed-trials.sh <job-dir> [-n N]
 #
 #   -n N   set trial concurrency to N before resuming (Pier has no -n on
 #          resume; both config.json and lock.json must be changed together or
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
     *) JOB="$1"; shift ;;
   esac
 done
-JOB="${JOB:-jobs/deepswe-gufo-qwen3.8-flash-next-tp2-q8}"
+[[ -n "$JOB" ]] || { echo "ERROR: job dir required: $0 jobs/<job-dir> [-n N]" >&2; exit 1; }
 case "$JOB" in /*) ;; *) JOB="$REPO/$JOB" ;; esac
 MCP_MARKER="No module named 'mcp'"
 PIER_MSA="/home/ugo/.local/share/uv/tools/datacurve-pier/lib/python3.13/site-packages/pier/agents/installed/mini_swe_agent.py"
@@ -68,10 +68,21 @@ docker network create "__pool-probe" >/dev/null 2>&1 \
   || die "docker address pool still exhausted - remove orphan networks: docker network ls"
 docker ps --format '{{.Names}}' | grep -q '^deepswe-relay$' \
   || die "deepswe-relay container is down (see README §3.2)"
-echo -n "model endpoint: "
+# the model comes from the job being resumed - never hardcoded
+MODEL_ID=$(python3 - "$JOB/config.json" <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1]))
+agents = c.get("agents") or [{}]
+m = ((agents[0] or {}).get("model_name")) or ""
+if not m:
+    sys.exit("cannot determine model: no agents[0].model_name in " + sys.argv[1])
+print(m.split("/", 1)[1] if "/" in m else m)   # proxy ids are bare
+PY
+)
+echo -n "model endpoint ($MODEL_ID): "
 WARM=$(curl -s -m 300 -o /dev/null -w '%{http_code}' http://127.0.0.1:4000/v1/chat/completions \
   -H 'Content-Type: application/json' \
-  -d '{"model":"gufo-qwen3.8-flash-next-tp2-q8","messages":[{"role":"user","content":"ping"}],"max_tokens":1}')
+  -d "{\"model\":\"${MODEL_ID}\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"max_tokens\":1}")
 [[ "$WARM" == "200" ]] || die "model warm-up failed (HTTP $WARM)"
 echo "OK"
 FREE_GB=$(df -BG --output=avail "$REPO" | tail -1 | tr -dc '0-9')

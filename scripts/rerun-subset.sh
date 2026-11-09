@@ -15,8 +15,8 @@
 #               (HANDOFF-20261024-1902.md §5; static list). Reruns only the ones
 #               that are still unsolved AND show progress: latest attempt
 #               f2p >= 0.5 (solved dropped; zeros like wasmi dropped)
-#   failed23    the 23-task residual set of the gufo campaign
-#               (reports/final-report-2026-10-26.md §3/Appendix A; static list).
+#   failed23    the 23-task residual set (reports/final-report-2026-10-26.md
+#               §3/Appendix A; static list).
 #               Drops tasks the CURRENT MODEL already scored reward=1 on, so it is
 #               model-agnostic: MODEL=maya-glm5-s-tp2 ./scripts/rerun-subset.sh
 #               failed23 --incremental  -> one column of the maya-campaign matrix
@@ -25,7 +25,8 @@
 #   --incremental  inject commit-incremental.yaml (commit after each feature;
 #                  otherwise discarded-at-submit work scores zero - see
 #                  reports/zeros-rerun-analysis-2026-10-21.md)
-#   MODEL=... override the model (default gufo-qwen3.8-flash-next-tp2-q8)
+#   MODEL=<id>  REQUIRED - the model id for this run (no default);
+#               list them with: curl -s http://127.0.0.1:4000/v1/models
 #
 #   --tag T     append -T to the job name (e.g. --tag r2 -> ...-inc-r2),
 #               needed to rerun a group whose previous job dir already exists
@@ -35,10 +36,11 @@
 set -euo pipefail
 
 REPO="/home/ugo/projects/deepswe-test"
-MAIN="$REPO/jobs/deepswe-gufo-qwen3.8-flash-next-tp2-q8"
-MODEL="${MODEL:-gufo-qwen3.8-flash-next-tp2-q8}"
+MODEL="${MODEL:-}"
 PIER_MSA="/home/ugo/.local/share/uv/tools/datacurve-pier/lib/python3.13/site-packages/pier/agents/installed/mini_swe_agent.py"
 MODEL_SLUG="${MODEL//\//_}"
+# baseline campaign job for this model - derived from MODEL, never hardcoded
+MAIN="$REPO/jobs/deepswe-${MODEL_SLUG}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -56,7 +58,7 @@ done
 [[ "$GROUP" == "zeros" || "$GROUP" == "nearmiss" || "$GROUP" == "failed13" || "$GROUP" == "wallvictims" || "$GROUP" == "failed23" ]] \
   || die "group must be zeros, nearmiss, failed13, wallvictims or failed23"
 [[ "$N_CONC" =~ ^[0-9]+$ && "$N_CONC" -ge 1 ]] || die "invalid -n: $N_CONC"
-[[ -f "$MAIN/result.json" ]] || die "main job not found: $MAIN"
+[[ -n "$MODEL" ]] || die "MODEL env var is required (no default) - list ids: curl -s http://127.0.0.1:4000/v1/models"
 
 [[ "$TAG" =~ ^[A-Za-z0-9._-]+$ ]] || { [[ -z "$TAG" ]] || die "invalid --tag: $TAG"; }
 JOB_NAME="deepswe-${MODEL_SLUG}-${GROUP}-rerun"
@@ -111,7 +113,7 @@ PYEOF
   )
 elif [[ "$GROUP" == "failed23" ]]; then
   # static residual set from reports/final-report-2026-10-26.md (23 tasks unsolved
-  # by gufo). Per-model solved-guard: drop tasks THIS model already scored
+  # by the baseline campaign). Per-model solved-guard: drop tasks THIS model already scored
   # reward=1 on, so the group is model-agnostic (MODEL=... selects the column).
   mapfile -t TASKS < <(python3 - "$MODEL_SLUG" "$REPO/jobs" <<'PYEOF'
 import json, glob, os, sys
@@ -153,7 +155,7 @@ print('\n'.join(s for s in FAILED23 if s not in solved))
 PYEOF
   )
 elif [[ "$GROUP" == "failed13" ]]; then
-  SOURCE_JOB="$REPO/jobs/deepswe-gufo-qwen3.8-flash-next-tp2-q8-zeros-rerun"
+  SOURCE_JOB="$REPO/jobs/deepswe-${MODEL_SLUG}-zeros-rerun"
   [[ -d "$SOURCE_JOB" ]] || die "zeros-rerun job not found: $SOURCE_JOB"
   mapfile -t TASKS < <(python3 - "$SOURCE_JOB" "$MODEL_SLUG" <<'PYEOF'
 import json, glob, os, sys
@@ -178,6 +180,7 @@ print('\n'.join(sorted(set(sel) - solved)))
 PYEOF
   )
 else
+  [[ -f "$MAIN/result.json" ]] || die "main job not found: $MAIN (needed for group '$GROUP')"
   mapfile -t TASKS < <(python3 - "$MAIN" "$GROUP" "$MODEL_SLUG" <<'PYEOF'
 import json, glob, os, sys
 main, group, model_slug = sys.argv[1], sys.argv[2], sys.argv[3]
