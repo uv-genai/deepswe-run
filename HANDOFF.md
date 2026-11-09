@@ -48,6 +48,7 @@
 | Trial base URL | **`OPENAI_BASE_URL=http://172.17.0.1/v1`** — never `127.0.0.1` (that's the container itself) |
 | Host-name pin | `/etc/hosts` pins `127.0.0.1 system76.local`, `nsswitch files first` (mDNS flaked); backup `/etc/hosts.bak-deepswe` |
 | squid read timeout | **patched to 3600 s** in pier's egress template (`agent_setup.py` heredoc) — must stay **above** litellm's `timeout`; restore with `scripts/reapply-squid-timeout.sh` |
+| uv install | **patched** in pier's mini-swe Dockerfile template: 5× retry + **PyPI fallback** (`pip install uv==0.7.13`) — the GitHub release asset flapped 504 (2026-11-09) and killed trial builds; restore with `scripts/reapply-uv-install.sh` |
 
 ## 3. Hard-won rules (each cost real downtime)
 
@@ -71,7 +72,8 @@
    (never a broad pattern — it self-killed twice). SIGTERM is ignored → use `-9`.
    After any kill: reclaim networks (rule 1).
 7. **pier upgrades wipe site-packages edits.** After `uv tool upgrade datacurve-pier`
-   run **both**: `./scripts/reapply-litellm-pin.sh` and `./scripts/reapply-squid-timeout.sh`.
+   run **all three**: `./scripts/reapply-litellm-pin.sh`, `./scripts/reapply-uv-install.sh`,
+   and `./scripts/reapply-squid-timeout.sh`.
 8. **No model probes unless the operator asks** (they show on dashboards); preflight
    warm-ups inside launch scripts are fine. Verify launches via logs/scoreboard.
 
@@ -157,7 +159,7 @@ read timeout vs long thinking (fixed 11-03), plus a historic squid timeout on
 | `scripts/rerun-{zeros,nearmiss,failed13,wallvictims}.sh` | thin wrappers (failed13/wallvictims force `--incremental`) |
 | `scripts/rerun-failed-trials.sh` / `start-rerun.sh` | resume-with-repair (quarantine, network reclaim, concurrency edit) |
 | `scripts/scoreboard.sh` | live results (`./scripts/scoreboard.sh [job-dir] [-n s]`) |
-| `scripts/reapply-litellm-pin.sh` / `reapply-squid-timeout.sh` | restore pier site-packages patches after upgrades |
+| `scripts/reapply-litellm-pin.sh` / `reapply-uv-install.sh` / `reapply-squid-timeout.sh` | restore pier site-packages patches after upgrades |
 | `scripts/free-space.sh` | reclaim per-trial images + cap builder cache |
 | `commit-incremental.yaml` | agent config with commit-mandate (use via `--incremental`/`-c`) |
 | `reports/final-report-2026-10-26.md` | **gufo results of record** (+ addendum: wasmi solved by maya) |
@@ -176,6 +178,7 @@ systemctl is-active litellm              # active (operator's — do not touch)
 docker ps --format '{{.Names}}' | grep deepswe-relay    # present
 grep -c 'litellm==1.105.1' /home/ugo/.local/share/uv/tools/datacurve-pier/lib/python*/site-packages/pier/agents/installed/mini_swe_agent.py   # 1 = pin intact
 grep -c '^read_timeout 3600 seconds' /home/ugo/.local/share/uv/tools/datacurve-pier/lib/python*/site-packages/pier/environments/agent_setup.py  # 1 = squid patch intact
+grep -c 'falling back to PyPI' /home/ugo/.local/share/uv/tools/datacurve-pier/lib/python*/site-packages/pier/agents/installed/mini_swe_agent.py  # 1 = uv patch intact
 grep -n 'timeout: 1800' ~/software/litellm/litellm_config.yaml                   # present
 pgrep -af "bin/python .*pier" | grep -v grep        # empty = no job running
 curl -s -m 15 -o /dev/null -w '%{http_code}\n' http://127.0.0.1:4000/v1/models  # 200

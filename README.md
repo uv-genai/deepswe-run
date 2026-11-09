@@ -195,6 +195,17 @@ re-run after pier upgrades alongside the litellm pin. The value must stay
 deadline, which satisfies squid's read timer). Applies to trial containers
 started from now on — nothing to restart.
 
+**uv install hardening (same upgrade discipline).** pier's agent Dockerfile
+installed uv only via the astral.sh installer, which chains to GitHub's
+release-asset CDN — that asset flapped with **HTTP 504** (2026-11-09) and killed
+trial builds for hours (`RuntimeError: docker compose build`, 2 of 22 trials
+lost in one round, 3 more in the next). `./scripts/reapply-uv-install.sh`
+patches the template to **retry the installer 5× (bounded curl) and fall back to
+`pip install uv==0.7.13` from PyPI**, and to tolerate a missing
+`~/.local/bin/env`. Both paths are container-tested (forced-504 → fallback →
+exit 0; normal installer → exit 0). Idempotent, ast-verified, re-run after pier
+upgrades with the other two patches. Applies to trial images built from now on.
+
 ---
 
 ## 4. Running benchmarks
@@ -395,6 +406,7 @@ scripts/                    all runnable scripts (invoke from the repo root):
   start-rerun.sh              detached launcher -> rerun-failed-trials.sh
   reapply-litellm-pin.sh      re-pin litellm after a pier upgrade (§3.5)
   reapply-squid-timeout.sh    restore pier's squid read_timeout patch (§3.5)
+  reapply-uv-install.sh       restore pier's uv retry+PyPI-fallback patch (§3.5)
   free-space.sh               reclaim per-trial docker images + build cache
   resume.sh                   one-off: resume the interrupted gufo job
   run-deepswe-miny.py         helper: generate deepswe-mini test cases
