@@ -9,10 +9,11 @@
 
 ## 0. TL;DR for a fresh session
 
-- **Standing:** gufo campaign **91/113 (80.5%)** — 90 at the final-report cut
-  (`reports/final-report-2026-10-26.md`, tag `final-2026-10-26-90-113-v2`) + wasmi
-  solved on attempt 7, 2026-11-07 (postscript in that report). Residual **22**.
-  No jobs running; git clean and pushed.
+- **Standing:** gufo campaign **94/113 (83.2%)** — 90 at the final-report cut, then
+  +wasmi (attempt 7, 11-07), then **+3 from its own `failed23` arm** (fastapi-deprecation,
+  fastapi-implicit, pebble; 11-09). Residual **19**; the zero-pass set is now **empty**.
+  Details: `reports/final-report-2026-10-26.md` postscript +
+  `reports/failed23-task-guide-2026-11-09.md` (task descriptions/complexity).
 - **In flight:** the **maya campaign** (GLM-5 S/M/L ±MTP on the 23 residual tasks)
   — `reports/maya-campaign-2026-10-31.md`; partial: wasmi solved by all three sizes.
 - **Pending (§6):** leaderboard-grade one-shot gufo run, `failed23` batches for the
@@ -79,19 +80,20 @@
 
 ## 4. Where things stand (results)
 
-**gufo campaign — 91/113 (80.5%)**: main 66 → +1 arktype 67 → +3 zeros 70
-→ +8 failed13 78 → +10 nearmiss 88 → +2 wallvictims 90 → **+1 wasmi (attempt 7,
-post-upgrade, 2026-11-07) = 91**. Full analysis:
+**gufo campaign — 94/113 (83.2%)**: main 66 → +1 arktype 67 → +3 zeros 70
+→ +8 failed13 78 → +10 nearmiss 88 → +2 wallvictims 90 → +1 wasmi (attempt 7,
+post-upgrade, 11-07) → **+3 failed23 arm (fastapi-deprecation, fastapi-implicit,
+pebble, 11-09) = 94**. Full analysis:
 `reports/final-report-2026-10-26.md` (§2 = three platform-fix phases, §3 = failure
 taxonomy of the 23 residuals, §4 = attribution, §6 = leaderboard comparison).
 
-**Residual 22** (the `failed23` group; the guard now selects 22 for gufo too —
-wasmi dropped after its 11-07 solve): 3 chronic p2p regressors (gql/bandit/pest —
+**Residual 19** (the `failed23` static list still holds all 23; the guard selects 19
+for gufo now): 3 chronic p2p regressors (gql/bandit/pest —
 deterministic, same test every attempt), ~17 one/few-f2p-test misses (half with
 identical failing tests across attempts), 3 harness-wiped near-misses (meriyah
 45/49→0/49, koota-pair 37/38→0/38, updo 15/17→0/17), kombu (deliberate empty diff).
-Zero-pass (reward=0, f2p 0/N) in gufo's view: **koota-pair, meriyah, updo** (all
-empty-patch harness casualties; wasmi left this list on 2026-11-07).
+Zero-pass (reward=0, f2p 0/N) in gufo's view: **none** — koota-pair, meriyah and updo
+all left that list on 11-09 (f2p > 0 in their latest attempts).
 
 **maya campaign — in progress** (`reports/maya-campaign-2026-10-31.md`):
 - `wasmi-trap-coredumps` **solved 22/22 by maya-{s,m,l}-tp2-mtp** (first attempt each);
@@ -136,8 +138,10 @@ read timeout vs long thinking (fixed 11-03), plus a historic squid timeout on
    ```bash
    MODEL=maya-glm5-m-tp2-mtp  ./scripts/rerun-subset.sh failed23 --incremental -n 2
    ```
-   arms: `maya-glm5-{s,m,l}-tp2`, `maya-glm5-{s,m,l}-tp2-mtp`; gufo post-upgrade
-   retest is partial (wasmi attempt 7 solved → 91/113; awilix still open for gufo).
+   arms: `maya-glm5-{s,m,l}-tp2`, `maya-glm5-{s,m,l}-tp2-mtp`.
+   **Status:** gufo arm **done** (22/22 graded, 3 solved → 94/113); maya-glm5-m arm
+   19/22 graded with **8 solved** (kombu, updo, kea, prometheus, mashumaro, koota-pair,
+   fastapi-deprecation, pebble) — the last trials re-running after the uv-504 fix.
    ~17–18 h/arm at `-n 2`, ~40 GB; `free-space.sh` between arms.
 3. **Done:** maya-l awilix rerun (11-04: 23/24, clean) and the **gufo Q8-vs-Q4
    same-weights A/B** (11-07: identical outcomes — wasmi ✅ 22/22 both, awilix
@@ -164,6 +168,7 @@ read timeout vs long thinking (fixed 11-03), plus a historic squid timeout on
 | `commit-incremental.yaml` | agent config with commit-mandate (use via `--incremental`/`-c`) |
 | `reports/final-report-2026-10-26.md` | **gufo results of record** (+ addendum: wasmi solved by maya) |
 | `reports/maya-campaign-2026-10-31.md` | maya campaign matrix + datapoints |
+| `reports/failed23-task-guide-2026-11-09.md` | the 23 residual tasks: what each does, complexity tiers, status per arm |
 | `reports/model-comparison-2026-11-04.md` | cross-model profiles: strengths/weaknesses, quantization vs size, which model for which task |
 | `reports/*` | earlier analysis (zeros-rerun, nearmiss-rerun, zero-pass, per-task) |
 | `log/` | all run logs (gitignored); `jobs/` | per-trial results (gitignored) |

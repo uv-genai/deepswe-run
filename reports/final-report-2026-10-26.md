@@ -219,6 +219,9 @@ solved `wasmi-trap-coredumps`:
 | Infra | clean: 0 read-timeouts, no context errors, no exception |
 
 **Standing: 91/113 (80.5 %)** — the 90 above was the report cut; residual now **22**.
+*(Update 2026-11-09: gufo's own `failed23` arm then solved 3 more — fastapi-deprecation,
+fastapi-implicit, pebble → **94/113 (83.2 %)**, residual 19, zero-pass set empty; see
+`failed23-task-guide-2026-11-09.md`.)*
 gufo's wasmi history in full: 3× context wall → 1 rabbit-hole → 1 Sync-breaking
 20/22 → **1 solve**. The zero-pass set shrinks to **3** (`koota-pair`, `meriyah`,
 `updo` — all empty-patch harness casualties, §3.3). §6's leaderboard comparison is
