@@ -407,6 +407,7 @@ scripts/                    all runnable scripts (invoke from the repo root):
   reapply-litellm-pin.sh      re-pin litellm after a pier upgrade (§3.5)
   reapply-squid-timeout.sh    restore pier's squid read_timeout patch (§3.5)
   reapply-uv-install.sh       restore pier's uv retry+PyPI-fallback patch (§3.5)
+  launch-failed-model.sh       launch failed23 for one model: ./scripts/launch-failed-model.sh <model-id>
   free-space.sh               reclaim per-trial docker images + build cache
   resume.sh                   one-off: resume the interrupted gufo job
   run-deepswe-miny.py         helper: generate deepswe-mini test cases
