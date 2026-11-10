@@ -139,9 +139,12 @@ read timeout vs long thinking (fixed 11-03), plus a historic squid timeout on
    MODEL=maya-glm5-m-tp2-mtp  ./scripts/rerun-subset.sh failed23 --incremental -n 2
    ```
    arms: `maya-glm5-{s,m,l}-tp2`, `maya-glm5-{s,m,l}-tp2-mtp`.
-   **Status:** gufo arm **done** (22/22 graded, 3 solved → 94/113); maya-glm5-m arm
-   19/22 graded with **8 solved** (kombu, updo, kea, prometheus, mashumaro, koota-pair,
-   fastapi-deprecation, pebble) — the last trials re-running after the uv-504 fix.
+   **Status (all arms done):** gufo arm 22/22 graded, 3 solved → **94/113**;
+   maya-glm5-m arm 22/22, 9 solved (+wasmi = **10/23**); maya-deepseek-s-mtp arm
+   23/23, 10 solved (**10/23**, failed wasmi on an empty patch — requeue pending).
+   Union of the three arms: **16/23**; open for every arm: bandit, gql,
+   httpx-streaming, ink-grid, meriyah, pest, termenv. Full results + performance:
+   `reports/failed23-arm-comparison-2026-11-10.md`.
    ~17–18 h/arm at `-n 2`, ~40 GB; `free-space.sh` between arms.
 3. **Done:** maya-l awilix rerun (11-04: 23/24, clean) and the **gufo Q8-vs-Q4
    same-weights A/B** (11-07: identical outcomes — wasmi ✅ 22/22 both, awilix
@@ -169,6 +172,7 @@ read timeout vs long thinking (fixed 11-03), plus a historic squid timeout on
 | `reports/final-report-2026-10-26.md` | **gufo results of record** (+ addendum: wasmi solved by maya) |
 | `reports/maya-campaign-2026-10-31.md` | maya campaign matrix + datapoints |
 | `reports/failed23-task-guide-2026-11-09.md` | the 23 residual tasks: what each does, complexity tiers, status per arm |
+| `reports/failed23-arm-comparison-2026-11-10.md` | 3-arm results matrix + performance (time/tokens/turns, cost per solve) |
 | `reports/model-comparison-2026-11-04.md` | cross-model profiles: strengths/weaknesses, quantization vs size, which model for which task |
 | `reports/*` | earlier analysis (zeros-rerun, nearmiss-rerun, zero-pass, per-task) |
 | `log/` | all run logs (gitignored); `jobs/` | per-trial results (gitignored) |
