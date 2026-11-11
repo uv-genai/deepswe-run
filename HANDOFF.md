@@ -95,7 +95,8 @@ identical failing tests across attempts), 3 harness-wiped near-misses (meriyah
 Zero-pass (reward=0, f2p 0/N) in gufo's view: **none** — koota-pair, meriyah and updo
 all left that list on 11-09 (f2p > 0 in their latest attempts).
 
-**maya campaign — in progress** (`reports/maya-campaign-2026-10-31.md`):
+**maya campaign — 16/23 solved across arms** (`reports/maya-campaign-2026-10-31.md` +
+`reports/failed23-arm-comparison-2026-11-10.md`):
 - `wasmi-trap-coredumps` **solved 22/22 by maya-{s,m,l}-tp2-mtp** (first attempt each);
   S burned 2× output / 3× input tokens of M for the same score (quant-efficiency signal)
 - `awilix`: **solved 24/24 by `maya-deepseek-s` (DeepSeek v4.1 Flash Q2/3, 1st try)** —
@@ -105,7 +106,14 @@ all left that list on 11-09 (f2p > 0 in their latest attempts).
   litellm timeout. Capability tracks the model, bit depth tracks cost (Datapoint 2)
 - S is a 2-bit GLM-5.3 quant, M slightly higher, L higher — the gufo-vs-GLM/DeepSeek
   comparison is the operator's quant-quality question (scorecard plan:
-  `quant-sensitive-tasks.md`; Q8-vs-Q4 same-weights arm ready via `failed23`)
+  `quant-sensitive-tasks.md`; Q8-vs-Q4 same-weights arm **done** 11-07 — identical
+  outcomes, `model-comparison-2026-11-04.md` §1.1/§3)
+- **failed23 arms + solos (11-10/11):** gufo 22/22 (3 solved → **94/113**), glm5-m
+  22/22 (9 solved), deepseek-s-mtp 23/23 (10 solved); solos: deepseek-s **wasmi +
+  updo** ✅ (11-10), glm5-m **effect-sse** ✅ (11-11) → **16/23 solved by ≥1 model;
+  7 open:** bandit, gql, httpx-streaming, ink-grid, meriyah, pest, termenv.
+  ⚠️ the **deepseek-s-mtp deployment still enforces a 262k context** (its wasmi died
+  at prompt 262,222) — raise it like the gufo backend before long-context tasks.
 
 **Platform incidents** (all found by the benchmark, all fixed): litellm router
 misconfig (tpm/timeout/retries, fixed 10-18), output-token cap (truncations in
@@ -140,8 +148,9 @@ read timeout vs long thinking (fixed 11-03), plus a historic squid timeout on
    ```
    arms: `maya-glm5-{s,m,l}-tp2`, `maya-glm5-{s,m,l}-tp2-mtp`.
    **Status (all arms done):** gufo arm 22/22 graded, 3 solved → **94/113**;
-   maya-glm5-m arm 22/22, 9 solved (+wasmi = **10/23**); maya-deepseek-s-mtp arm
-   23/23, 10 solved (**10/23**, failed wasmi on an empty patch — requeue pending).
+   maya-glm5-m arm 22/22, 9 solved (+wasmi + effect-sse solos = **11/23**);
+   maya-deepseek-s-mtp arm 23/23, 10 solved (its wasmi died at that deployment's
+   **262k context wall**; dspark-id solos wasmi + updo passed → deepseek **12/23**).
    Union of the three arms: **16/23**; open for every arm: bandit, gql,
    httpx-streaming, ink-grid, meriyah, pest, termenv. Full results + performance:
    `reports/failed23-arm-comparison-2026-11-10.md`.

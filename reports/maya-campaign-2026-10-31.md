@@ -23,7 +23,7 @@ Reference column = **gufo best attempt** across its 5–6 batches (Appendix A of
 | `awilix-async-container-initialization` | 23/24 · 162/162 | | | | | | **23/24 · 162/162** | 23/24 · 162/162 | **24/24 ✅ reward 1** |
 | `bandit-structured-nosec-directives` | 69/69 · p2p 281/282 | | | | | | |
 | `csstree-shorthand-expansion-compression` | 76/79 · 16715/16715 | | | | | | |
-| `effect-sse-httpapi-streaming` | 46/47 · 70/70 | | | | | | |
+| `effect-sse-httpapi-streaming` | 46/47 · 70/70 | | | | **47/47 ✅** (solo, 11-11) | | | | |
 | `fastapi-deprecation-response-headers` | 136/137 · 3134/3134 | | | | | | |
 | `fastapi-implicit-head-options` | 42/43 · 3134/3134 | | | | | | |
 | `gql-incremental-graphql-delivery` | 17/17 · p2p 810/811 | | | | | | |
@@ -40,9 +40,9 @@ Reference column = **gufo best attempt** across its 5–6 batches (Appendix A of
 | `pebble-durability-wait-apis` | 56/59 · 44/44 | | | | | | |
 | `prometheus-transactional-reload-status` | 10/15 · 82/82 | | | | | | |
 | `termenv-preserve-ansi-resets` | 34/35 · 87/87 | | | | | | |
-| `updo-policy-alerting` | 15/17 · 123/123 | | | | | | |
+| `updo-policy-alerting` | 15/17 · 123/123 | | | | | | | | **17/17 ✅** (solo, 11-10) |
 | `kombu-virtual-queue-dead-lettering` | 1/76 · 1412/1412 | | | | | | |
-| `wasmi-trap-coredumps` | **22/22 ✅** (attempt 7, 11-07) | | **22/22 ✅** | | **22/22 ✅** | | **22/22 ✅** |
+| `wasmi-trap-coredumps` | **22/22 ✅** (attempt 7, 11-07) | | **22/22 ✅** | | **22/22 ✅** | | **22/22 ✅** | | **22/22 ✅** (solo, 11-10) |
 
 ## Datapoint 1 — `wasmi-trap-coredumps` SOLVED by all three sizes (2026-10-31)
 
@@ -127,4 +127,7 @@ parent.initialize() first` — was passed by the DeepSeek Q2/3 arm on its first 
 | 2026-11-04 | **awilix solved by `maya-deepseek-s` (Q2/3): 24/24, partial 1.000** — first solve; beats gufo Q8 and GLM-m on the task |
 | 2026-11-04 | GLM-5.3 `maya-glm5-l-tp2-mtp` awilix rerun clean (no timeouts): 23/24, same edge test — prior zeros were the 792 s request vs the old 600 s litellm timeout |
 | 2026-11-07 | **gufo itself solved wasmi on attempt 7** (22/22, clean) → corpus 91/113; the task is no longer a gufo residual |
+| 2026-11-10 | **deepseek-s-mtp `failed23` arm complete: 23/23 graded, 10 solved** (awilix, csstree, effect-sse, fastapi-implicit, httpx-multipart, kombu, koota-deferred, mashumaro, obsidian-link, prometheus) — its wasmi attempt died on a **context wall (prompt 262,222 > 262,144)**: that deployment still runs the old ceiling |
+| 2026-11-10 | **deepseek-s (Q2/3) solo reruns both pass:** wasmi **22/22** (99 min, 150 steps) and updo **17/17** (56 min, 73 steps) — replacing the batch's 0/22 context-wall death |
+| 2026-11-11 | **glm5-m solo effect-sse: 47/47 ✅** (180 min, 221 steps) after its batch attempt graded 0; glm-m `failed23` arm finished **22/22 graded (9 solved)** — full three-arm analysis: `failed23-arm-comparison-2026-11-10.md` |
 | 2026-11-07 | **gufo Q4 same-weights A/B:** wasmi ✅ 22/22 (69 min, 250 steps), awilix 23/24 same edge test — outcomes identical to Q8, cost +20–40 % tokens at ~20 % faster decode (`model-comparison-2026-11-04.md` §1.1/§3) |
