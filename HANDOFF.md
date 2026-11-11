@@ -96,7 +96,7 @@ identical failing tests across attempts), 3 harness-wiped near-misses (meriyah
 Zero-pass (reward=0, f2p 0/N) in gufo's view: **none** — koota-pair, meriyah and updo
 all left that list on 11-09 (f2p > 0 in their latest attempts).
 
-**maya campaign — 16/23 solved across arms** (`reports/maya-campaign-2026-10-31.md` +
+**maya campaign — 17/23 solved across arms** (`reports/maya-campaign-2026-10-31.md` +
 `reports/failed23-arm-comparison-2026-11-10.md`):
 - `wasmi-trap-coredumps` **solved 22/22 by maya-{s,m,l}-tp2-mtp** (first attempt each);
   S burned 2× output / 3× input tokens of M for the same score (quant-efficiency signal)
@@ -111,8 +111,9 @@ all left that list on 11-09 (f2p > 0 in their latest attempts).
   outcomes, `model-comparison-2026-11-04.md` §1.1/§3)
 - **failed23 arms + solos (11-10/11):** gufo 22/22 (3 solved → **94/113**), glm5-m
   22/22 (9 solved), deepseek-s-mtp 23/23 (10 solved); solos: deepseek-s **wasmi +
-  updo** ✅ (11-10), glm5-m **effect-sse** ✅ (11-11) → **16/23 solved by ≥1 model;
-  7 open:** bandit, gql, httpx-streaming, ink-grid, meriyah, pest, termenv.
+  updo** ✅ (11-10), glm5-m **effect-sse** ✅ (11-11), deepseek-s **httpx-streaming** ✅
+  (11-11) → **17/23 solved by ≥1 model;
+  6 open:** bandit, gql, ink-grid, meriyah, pest, termenv.
   ⚠️ the **deepseek-s-mtp deployment still enforces a 262k context** (its wasmi died
   at prompt 262,222) — raise it like the gufo backend before long-context tasks.
 
@@ -151,9 +152,10 @@ read timeout vs long thinking (fixed 11-03), plus a historic squid timeout on
    **Status (all arms done):** gufo arm 22/22 graded, 3 solved → **94/113**;
    maya-glm5-m arm 22/22, 9 solved (+wasmi + effect-sse solos = **11/23**);
    maya-deepseek-s-mtp arm 23/23, 10 solved (its wasmi died at that deployment's
-   **262k context wall**; dspark-id solos wasmi + updo passed → deepseek **12/23**).
-   Union of the three arms: **16/23**; open for every arm: bandit, gql,
-   httpx-streaming, ink-grid, meriyah, pest, termenv. Full results + performance:
+   **262k context wall**; dspark-id solos wasmi + updo + httpx-streaming passed →
+   deepseek **13/23**).
+   Union incl. solos: **17/23**; open for every arm: bandit, gql,
+   ink-grid, meriyah, pest, termenv. Full results + performance:
    `reports/failed23-arm-comparison-2026-11-10.md`.
    ~17–18 h/arm at `-n 2`, ~40 GB; `free-space.sh` between arms.
 3. **Done:** maya-l awilix rerun (11-04: 23/24, clean) and the **gufo Q8-vs-Q4

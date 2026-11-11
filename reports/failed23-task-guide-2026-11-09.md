@@ -7,10 +7,10 @@
 gufo at the final-report cut. Companion: `final-report-2026-10-26.md` §3.
 
 **Standing note (11-11):** gufo's own `failed23` arm added 3 → **gufo = 94/113 (83.2 %),
-residual 19**. Across *all* arms, **16 of the 23 are now solved by at least one model**;
-**7 remain open for everyone** (bandit, gql, httpx-streaming, ink-grid, meriyah, pest,
-termenv). Latest movers: the deepseek-s-mtp arm (10 solves) and three solo re-runs
-(deepseek-s: wasmi, updo · glm5-m: effect-sse). All 23 are `category = feature_request` — DeepSWE tasks are written from
+residual 19**. Across *all* arms, **17 of the 23 are now solved by at least one model**;
+**6 remain open for everyone** (bandit, gql, ink-grid, meriyah, pest,
+termenv). Latest movers: the deepseek-s-mtp arm (10 solves) and four solo re-runs
+(deepseek-s: wasmi, updo, httpx-streaming · glm5-m: effect-sse). All 23 are `category = feature_request` — DeepSWE tasks are written from
 scratch as features, never adapted from real commits (contamination-free by design).
 
 ## How the complexity tiers were derived
@@ -43,7 +43,7 @@ each scored 0–3, summed to a 0–9 tier:
 | medium | `csstree-shorthand-expansion-compression` | javascript / csstree | Lexer methods expanding CSS shorthands↔longhands | 2.9 k | 518 ln | 79 | 4 | ✅ deepseek-s-mtp (batch) — best 76/79 beforehand |
 | medium | `fastapi-implicit-head-options` | python / fastapi | Implicit HEAD + automatic OPTIONS across routers/includes | 1.7 k | 939 ln | 43 | 3 | ✅ gufo + glm + deepseek-s-mtp (largest reference solution of the set) |
 | medium | `httpx-multipart-response-parsing` | python / httpx | Response iterators parsing multipart bodies into parts | 2.2 k | 600 ln | 122 | 3 | ✅ deepseek-s-mtp (batch) — best 121/122 beforehand (one folded-header edge) |
-| medium | `httpx-streaming-json-iteration` | python / httpx | Response iterators incrementally parsing streaming JSON | 2.6 k | 523 ln | 108 | 3 | open — same single ndjson edge test every attempt |
+| medium | `httpx-streaming-json-iteration` | python / httpx | Response iterators incrementally parsing streaming JSON | 2.6 k | 523 ln | 108 | 3 | ✅ ds-s solo (108/108, 11-11) — the ndjson edge every arm missed |
 | medium | `koota-deferred-mutation-buffer` | typescript / koota | Deferred command buffer batching entity mutations during query iteration | 1.0 k | 1031 ln | 71 | 4 | ✅ deepseek-s-mtp (batch) — biggest reference solution; best 70/71 beforehand |
 | medium | `pebble-durability-wait-apis` | go / pebble | Durability callbacks, wait methods, notifications, metrics for sync writes | 2.8 k | 654 ln | 59 | 4 | ✅ gufo + glm |
 | medium | `updo-policy-alerting` | go / updo | Policy-driven alerting: consecutive failures, latency, recovery, SSL expiry | 4.6 k | 669 ln | 17 | 4 | ✅ glm + deepseek-s solo (11-10) — second-longest spec |
@@ -70,10 +70,10 @@ each scored 0–3, summed to a 0–9 tier:
   several fail the *identical* test across models and attempts.
 - **Harness casualties (now recovered):** `meriyah`, `koota-pair` were zeroed by
   format-abort/empty-patch (koota-pair since solved by glm; meriyah's best 48/49 stands).
-- **Solved by ≥1 model (16):** awilix, csstree, effect-sse, fastapi-deprecation,
-  fastapi-implicit, httpx-multipart, kea, kombu, koota-deferred, koota-pair, mashumaro,
-  obsidian-link, pebble, prometheus, updo, wasmi.
-- **Still open for everyone (7):** bandit, gql, httpx-streaming, ink-grid, meriyah,
+- **Solved by ≥1 model (17):** awilix, csstree, effect-sse, fastapi-deprecation,
+  fastapi-implicit, httpx-multipart, httpx-streaming, kea, kombu, koota-deferred,
+  koota-pair, mashumaro, obsidian-link, pebble, prometheus, updo, wasmi.
+- **Still open for everyone (6):** bandit, gql, ink-grid, meriyah,
   pest, termenv.
 
 ## Arm status
@@ -83,4 +83,4 @@ each scored 0–3, summed to a 0–9 tier:
 | gufo `failed23` | 22/22 | 3 — fastapi-deprecation, fastapi-implicit, pebble |
 | maya-glm5-m `failed23` | 22/22 | 9 — fastapi-implicit, kombu, updo, kea, prometheus, mashumaro, koota-pair, fastapi-deprecation, pebble (effect-sse graded 0 in-arm → solved by its 11-11 solo rerun) |
 | maya-deepseek-s-mtp `failed23` | 23/23 | **10** — awilix (re-run in-arm: the solved-guard missed the `-dspark` id), csstree, effect-sse, fastapi-implicit, httpx-multipart, kombu, koota-deferred, mashumaro, obsidian-link, prometheus (its wasmi attempt hit that deployment's **262k context wall**) |
-| solo re-runs | — | deepseek-s: **wasmi 22/22, updo 17/17** (11-10) · glm5-m: **effect-sse 47/47** (11-11) |
+| solo re-runs | — | deepseek-s: **wasmi 22/22, updo 17/17, httpx-streaming 108/108** (11-10/11) · glm5-m: **effect-sse 47/47** (11-11) |

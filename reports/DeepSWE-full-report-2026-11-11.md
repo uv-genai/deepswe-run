@@ -19,8 +19,8 @@
 | Scope | Result |
 |---|---|
 | **gufo on the full 113-task corpus** | **94/113 (83.2 %)** — 66 (main) → 67 → 70 → 78 → 88 → 90 → 91 (wasmi, attempt 7) → **94** (its own failed23 arm: fastapi-deprecation, fastapi-implicit, pebble) |
-| **The 23-task residual set, best across all models** | **16/23 solved by ≥1 model; 7 open for everyone:** `bandit`, `gql`, `httpx-streaming`, `ink-grid`, `meriyah`, `pest`, `termenv` |
-| Per family on the 23-set | **deepseek 12/23** · **glm5-m 11/23** · gufo 4/23 |
+| **The 23-task residual set, best across all models** | **17/23 solved by ≥1 model; 6 open for everyone:** `bandit`, `gql`, `ink-grid`, `meriyah`, `pest`, `termenv` |
+| Per family on the 23-set | **deepseek 13/23** · **glm5-m 11/23** · gufo 4/23 |
 | Zero-pass trials (reward 0, f2p 0/N) | **none remaining** (was the historical signature of harness casualties — now cleared) |
 | Open platform item | ⚠️ the **`maya-deepseek-s-mtp` backend still enforces a 262k context** (its batch wasmi died at prompt 262,222) — gufo/glm backends are raised past 300k |
 
@@ -99,14 +99,14 @@ best-of-k across fixes. The leaderboard-grade one-shot on the fixed platform is 
 | obsidian-link-format | 59/60 | 59/60 | ✅60/60 | |
 | bandit-nosec | 69/69 ⚠️p2p | 68/69 | 67/69 | **open** — chronic p2p regressor |
 | gql-incremental | 17/17 ⚠️p2p | 17/17 ⚠️p2p | 16/17 | **open** — chronic p2p regressor |
-| httpx-streaming-json | 107/108 | 106/108 | 107/108 | **open** — same ndjson edge every time |
+| httpx-streaming-json | 107/108 | 106/108 | 107/108 (batch) → **✅ 108/108 solo** (11-11) | the ndjson edge — deepseek is the only solver |
 | ink-grid-layout | 21/25 | 23/25 | 23/25 | **open** — was a context-wall victim |
 | meriyah-using | 48/49 | 48/49 | 48/49 | **open** — *identical* 48/49 from all three |
 | pest-charclass | 100/104 ⚠️p2p | 103/104 | 104/104 | **open** — p2p regressor / whack-a-mole |
 | termenv-ansi | 30/35 | 34/35 | 34/35 | **open** — width-0 OSC edge |
 | wasmi-coredumps | ✅22/22 (attempt 7, pre-arm) | ✅22/22 (pre-arm solo) | batch **0/22** → **✅ solo 22/22** (11-10) | batch death = **262k context wall** (prompt 262,222) on the s-mtp deployment — *corrects the earlier "empty patch, requeue pending" note* |
 
-**Union: 16/23 solved · 7 open for every arm.**
+**Union: 17/23 solved · 6 open for every arm.**
 
 ---
 
@@ -162,6 +162,7 @@ near-misses into full solves.
 |---|---|---|---|---|---|
 | deepseek-s · wasmi | ✅22/22 | 99 min | 150 | 85.4 k | 62 KB |
 | deepseek-s · updo | ✅17/17 | 56 min | 73 | 87.0 k | 71 KB |
+| deepseek-s · httpx-streaming | ✅108/108 | 64 min | 84 | 93.3 k | 21 KB |
 | glm5-m · effect-sse | ✅47/47 | 180 min | 221 | 73.0 k | 48 KB |
 
 ### 5.5 Deep-dive effort tables (same task, many models)
@@ -194,9 +195,10 @@ near-misses into full solves.
 
 ### 6.1 Profiles
 
-- **DeepSeek v4.1 Flash (Q2/3) — the edge-closer and the efficiency winner.** Six unique
+- **DeepSeek v4.1 Flash (Q2/3) — the edge-closer and the efficiency winner.** Seven unique
   solves no other arm reached (awilix, csstree, effect-sse, httpx-multipart,
-  koota-deferred, obsidian-link): it converts the 95–99 % stall-outs into full solves.
+  koota-deferred, obsidian-link, httpx-streaming): it converts the 95–99 % stall-outs into
+  full solves.
   Best cost-per-solve on every axis (178 k output, 2.1 h), fewest turns, best cache.
   Its Q1 sibling still scored 23/24 on awilix → bit-robustness. Weakness: its *batch*
   run left two near-misses unconverted (updo 11/17, kea 10/12) — the solos fixed updo.
@@ -232,10 +234,11 @@ near-misses into full solves.
   existing test breaks every attempt, in every model for gql/pest. Rerun-proof; needs an
   "never modify existing tests" constraint or a harness rule.
 - **Identical single-edge misses:** `meriyah` 48/49 *from all three models*;
-  `httpx-streaming` (ndjson line), `termenv` (width-0 OSC), `ink-grid` — same failing
-  test across models and attempts → task/verifier edges, not model gaps.
-- **Verdict on "best model":** on the 23-set deepseek leads **12 vs 11** (gufo 4) — but
-  it's a one-task margin over non-identical protocols (batch vs solos; one id-mismatch
+  `termenv` (width-0 OSC), `ink-grid` — same failing test across models and attempts →
+  task/verifier edges, not model gaps (`httpx-streaming`'s ndjson edge looked the same
+  until deepseek closed it solo on 11-11 — evidence these *can* fall).
+- **Verdict on "best model":** on the 23-set deepseek leads **13 vs 11** (gufo 4) — but
+  it's a small margin over non-identical protocols (batch vs solos; one id-mismatch
   extra attempt). The **7-task tiebreaker** (both families rerun `failed23`, guard now
   selects exactly those 7) would settle it; only a full 113-task pass@1 run can crown an
   overall winner (only gufo has one).
@@ -270,7 +273,7 @@ Rubric = three intrinsic factors (reference-solution lines, spec length, f2p bre
 | medium | `csstree-shorthand-expansion-compression` | js / csstree | Lexer methods expanding CSS shorthands ↔ longhands | 2.9 k | 518 ln | 79 | ✅ ds |
 | medium | `fastapi-implicit-head-options` | py / fastapi | Implicit HEAD + automatic OPTIONS across routers/includes | 1.7 k | 939 ln | 43 | ✅ all three |
 | medium | `httpx-multipart-response-parsing` | py / httpx | Response iterators parsing multipart bodies into parts | 2.2 k | 600 ln | 122 | ✅ ds |
-| medium | `httpx-streaming-json-iteration` | py / httpx | Response iterators incrementally parsing streaming JSON | 2.6 k | 523 ln | 108 | ❌ open — same ndjson edge |
+| medium | `httpx-streaming-json-iteration` | py / httpx | Response iterators incrementally parsing streaming JSON | 2.6 k | 523 ln | 108 | ✅ ds (solo, 11-11) — the ndjson edge all arms missed |
 | medium | `koota-deferred-mutation-buffer` | ts / koota | Deferred buffer batching entity mutations during query iteration | 1.0 k | 1031 ln | 71 | ✅ ds |
 | medium | `pebble-durability-wait-apis` | go / pebble | Durability callbacks, wait methods, notifications, metrics for sync writes | 2.8 k | 654 ln | 59 | ✅ gufo + glm |
 | medium | `updo-policy-alerting` | go / updo | Policy alerting: failures, latency, recovery, SSL expiry | 4.6 k | 669 ln | 17 | ✅ glm + ds (solo) |
@@ -292,7 +295,7 @@ Rubric = three intrinsic factors (reference-solution lines, spec length, f2p bre
 
 ## 9. Open items / next steps
 
-1. **The 7-task tiebreaker** — run `failed23` on both families (guard selects exactly the 7 open):
+1. **The 6-task tiebreaker** — run `failed23` on both families (guard selects exactly the 6 open):
    `./scripts/launch-failed-model.sh maya-deepseek-s-mtp` then `maya-glm5-m-tp2-mtp`.
    Settles 12-vs-11 and can take the set to 23/23.
 2. **Raise the `maya-deepseek-s-mtp` backend context** (still 262k — it cost a wasmi batch).

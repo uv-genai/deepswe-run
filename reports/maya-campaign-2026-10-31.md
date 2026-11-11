@@ -28,7 +28,7 @@ Reference column = **gufo best attempt** across its 5–6 batches (Appendix A of
 | `fastapi-implicit-head-options` | 42/43 · 3134/3134 | | | | | | |
 | `gql-incremental-graphql-delivery` | 17/17 · p2p 810/811 | | | | | | |
 | `httpx-multipart-response-parsing` | 121/122 · 1272/1272 | | | | | | |
-| `httpx-streaming-json-iteration` | 107/108 · 1404/1404 | | | | | | |
+| `httpx-streaming-json-iteration` | 107/108 · 1404/1404 | | | | | | | | **108/108 ✅** (solo, 11-11) |
 | `ink-grid-box-layout` | 24/25 · 49/49 | | | | | | |
 | `koota-deferred-mutation-buffer` | 70/71 · 128/128 | | | | | | |
 | `kea-atomic-signal-selectors` | 11/12 · 139/139 | | | | | | |
@@ -130,4 +130,5 @@ parent.initialize() first` — was passed by the DeepSeek Q2/3 arm on its first 
 | 2026-11-10 | **deepseek-s-mtp `failed23` arm complete: 23/23 graded, 10 solved** (awilix, csstree, effect-sse, fastapi-implicit, httpx-multipart, kombu, koota-deferred, mashumaro, obsidian-link, prometheus) — its wasmi attempt died on a **context wall (prompt 262,222 > 262,144)**: that deployment still runs the old ceiling |
 | 2026-11-10 | **deepseek-s (Q2/3) solo reruns both pass:** wasmi **22/22** (99 min, 150 steps) and updo **17/17** (56 min, 73 steps) — replacing the batch's 0/22 context-wall death |
 | 2026-11-11 | **glm5-m solo effect-sse: 47/47 ✅** (180 min, 221 steps) after its batch attempt graded 0; glm-m `failed23` arm finished **22/22 graded (9 solved)** — full three-arm analysis: `failed23-arm-comparison-2026-11-10.md` |
+| 2026-11-11 | **deepseek-s solo httpx-streaming: 108/108 ✅** (64 min, 84 turns, 93.3 k out, p2p 1404/1404) — the ndjson edge that failed every arm; 23-set now **17/23 solved, 6 open** |
 | 2026-11-07 | **gufo Q4 same-weights A/B:** wasmi ✅ 22/22 (69 min, 250 steps), awilix 23/24 same edge test — outcomes identical to Q8, cost +20–40 % tokens at ~20 % faster decode (`model-comparison-2026-11-04.md` §1.1/§3) |
