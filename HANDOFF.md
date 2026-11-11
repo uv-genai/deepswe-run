@@ -80,7 +80,8 @@
 
 ## 4. Where things stand (results)
 
-**gufo campaign — 94/113 (83.2%)**: main 66 → +1 arktype 67 → +3 zeros 70
+**gufo campaign — 94/113 (83.2%)** (consolidated: `reports/DeepSWE-full-report-2026-11-11.md`):
+main 66 → +1 arktype 67 → +3 zeros 70
 → +8 failed13 78 → +10 nearmiss 88 → +2 wallvictims 90 → +1 wasmi (attempt 7,
 post-upgrade, 11-07) → **+3 failed23 arm (fastapi-deprecation, fastapi-implicit,
 pebble, 11-09) = 94**. Full analysis:
@@ -178,7 +179,8 @@ read timeout vs long thinking (fixed 11-03), plus a historic squid timeout on
 | `scripts/reapply-litellm-pin.sh` / `reapply-uv-install.sh` / `reapply-squid-timeout.sh` | restore pier site-packages patches after upgrades |
 | `scripts/free-space.sh` | reclaim per-trial images + cap builder cache |
 | `commit-incremental.yaml` | agent config with commit-mandate (use via `--incremental`/`-c`) |
-| `reports/final-report-2026-10-26.md` | **gufo results of record** (+ addendum: wasmi solved by maya) |
+| `reports/DeepSWE-full-report-2026-11-11.md` | **THE consolidated report** — results, performance (turns/time/tokens/cost-per-solve), model-quality analysis, 23-task catalog, failure taxonomy; supersedes the detail reports below |
+| `reports/final-report-2026-10-26.md` | gufo results of record (+ addendum: wasmi solved by maya) |
 | `reports/maya-campaign-2026-10-31.md` | maya campaign matrix + datapoints |
 | `reports/failed23-task-guide-2026-11-09.md` | the 23 residual tasks: what each does, complexity tiers, status per arm |
 | `reports/failed23-arm-comparison-2026-11-10.md` | 3-arm results matrix + performance (time/tokens/turns, cost per solve) |
