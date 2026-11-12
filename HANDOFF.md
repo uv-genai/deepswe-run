@@ -114,6 +114,8 @@ all left that list on 11-09 (f2p > 0 in their latest attempts).
   updo** ✅ (11-10), glm5-m **effect-sse** ✅ (11-11), deepseek-s **httpx-streaming** ✅
   (11-11) → **17/23 solved by ≥1 model;
   6 open:** bandit, gql, ink-grid, meriyah, pest, termenv.
+  (11-12 tiebreaker, deepseek-s on the6: **0/6** — 3 p2p-regressor failures with
+  perfect f2p + 3 genuine misses; gql broke the byte-identical test as gufo does)
   ⚠️ the **deepseek-s-mtp deployment still enforces a 262k context** (its wasmi died
   at prompt 262,222) — raise it like the gufo backend before long-context tasks.
 

@@ -165,6 +165,11 @@ near-misses into full solves.
 | deepseek-s · httpx-streaming | ✅108/108 | 64 min | 84 | 93.3 k | 21 KB |
 | glm5-m · effect-sse | ✅47/47 | 180 min | 221 | 73.0 k | 48 KB |
 
+**deepseek-s 6-task tiebreaker run (11-12, all reward 0):** bandit 51 min/90 turns
+(f2p 69/69, p2p broken) · gql 57 min/122 (f2p 17/17, p2p broken) · ink 76 min/132
+(21/25) · meriyah 76 min/162 (45/49) · pest 54 min/129 (f2p 103/104 + p2p broken) ·
+termenv 51 min/62 (30/35) — signatures in §6.3.
+
 ### 5.5 Deep-dive effort tables (same task, many models)
 
 **wasmi — five runs, one identical score** (+ deepseek solo):
@@ -230,13 +235,18 @@ near-misses into full solves.
 
 ### 6.3 The deterministic core (why 7 tasks stay open)
 
-- **Chronic p2p regressors:** `gql`, `bandit`, `pest` — f2p often perfect, but the *same*
-  existing test breaks every attempt, in every model for gql/pest. Rerun-proof; needs an
-  "never modify existing tests" constraint or a harness rule.
-- **Identical single-edge misses:** `meriyah` 48/49 *from all three models*;
-  `termenv` (width-0 OSC), `ink-grid` — same failing test across models and attempts →
-  task/verifier edges, not model gaps (`httpx-streaming`'s ndjson edge looked the same
-  until deepseek closed it solo on 11-11 — evidence these *can* fall).
+- **Chronic p2p regressors — now proven cross-family (gufo *and* deepseek):** `gql`
+  breaks the *byte-identical* existing test
+  (`test_execute_incremental_on_unsupported_transport_raises`) in every attempt by both
+  families; `bandit` breaks `test_058_region_unioned_across_statement_lines` in both;
+  `pest` toggles (perfect f2p + broken p2p, or the inverse — never both). On bandit and
+  gql **f2p is 100 %** — the failure is collateral damage to an existing test, so these
+  three p2p suites are sensitive to *any* reasonable implementation, not to a model gap.
+- **Broad multi-corner tasks (not single-edge):** deepseek's 11-12 tiebreaker run went
+  **0/6** — `ink-grid` 21/25, `meriyah` 45/49 (different corners than the arms' shared
+  48/49), `termenv` 30/35, each with *different* failing tests than earlier attempts.
+  The remaining non-regressor tasks are hard in a scattered way, not pinned to one line
+  (`httpx-streaming`'s single ndjson edge, by contrast, fell to deepseek solo on 11-11).
 - **Verdict on "best model":** on the 23-set deepseek leads **13 vs 11** (gufo 4) — but
   it's a small margin over non-identical protocols (batch vs solos; one id-mismatch
   extra attempt). The **7-task tiebreaker** (both families rerun `failed23`, guard now
@@ -295,9 +305,12 @@ Rubric = three intrinsic factors (reference-solution lines, spec length, f2p bre
 
 ## 9. Open items / next steps
 
-1. **The 6-task tiebreaker** — run `failed23` on both families (guard selects exactly the 6 open):
-   `./scripts/launch-failed-model.sh maya-deepseek-s-mtp` then `maya-glm5-m-tp2-mtp`.
-   Settles 12-vs-11 and can take the set to 23/23.
+1. **The 6-task tiebreaker — first leg run (11-12, deepseek-s): 0/6** (3 p2p-regressor
+   failures with perfect/near-perfect f2p + 3 genuine misses below previous bests);
+   the6 remain open, deepseek stays 13/23. Second leg when convenient:
+   `./scripts/launch-failed-model.sh maya-glm5-m-tp2-mtp` (guard selects exactly the 6).
+   A gufo retry of the 3 regressors under a "never modify existing tests" prompt would
+   also be informative.
 2. **Raise the `maya-deepseek-s-mtp` backend context** (still 262k — it cost a wasmi batch).
 3. **Leaderboard-grade one-shot** for gufo (stock config, single attempt, fixed platform) —
    the only number comparable to the board's 74 % top.

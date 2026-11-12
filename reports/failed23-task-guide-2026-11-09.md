@@ -64,7 +64,9 @@ each scored 0–3, summed to a 0–9 tier:
 ## Observed-difficulty patterns (independent of the tiers)
 
 - **Chronic p2p regressors (3):** `gql`, `bandit`, `pest` — never *solved*, but the failure
-  is always collateral damage to an existing test, often the same one every attempt.
+  is always collateral damage to an existing test. Confirmed cross-family on 11-12:
+  deepseek-s hit the same traps (bandit f2p 69/69 + broken p2p; gql 17/17 + broken p2p,
+  byte-identical test to gufo's) — the p2p suites react to any implementation, not a model.
 - **Single-edge walls:** `awilix`, `kea`, `httpx-streaming`, `termenv`, `csstree`,
   `obsidian-link`, `httpx-multipart` — models reach 95–99 % and stop on one precise case;
   several fail the *identical* test across models and attempts.
